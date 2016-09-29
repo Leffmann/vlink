@@ -1,11 +1,11 @@
-/* $VER: vlink vlink.h V0.15a (09.12.15)
+/* $VER: vlink vlink.h V0.15b (08.07.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -198,6 +198,7 @@ struct Section {
   unsigned long offset;         /* offset relative to 1st sec. of same type */
   uint8_t *data;                /* the section's contents */
   unsigned long size;           /* the section's size in bytes (+alignment) */
+  unsigned long last_reloc;	/* offset to location behind last reloc/xref */
   struct list relocs;           /* relocations for this section */
   struct list xrefs;            /* external references to unknown symbols */
   struct RelRef *relrefs;       /* all sections which are referenced rel. */
@@ -729,8 +730,10 @@ extern void write16(bool,void *,uint16_t);
 extern void write32(bool,void *,uint32_t);
 extern void write64(bool,void *,uint64_t);
 extern int writetaddr(struct GlobalVars *,void *,lword);
-extern uint32_t readbf32(bool,void *,int,int);
-extern void writebf32(bool,void *,int,int,uint32_t);
+extern lword readbf(bool,void *,int,int,int);
+extern void writebf(bool,void *,int,int,int,lword);
+extern lword readreloc(bool,void *,int,int);
+extern void writereloc(bool,void *,int,int,lword);
 extern void fwritex(FILE *,const void *,size_t);
 extern void fwrite32be(FILE *,uint32_t);
 extern void fwrite16be(FILE *,uint16_t);
@@ -744,6 +747,7 @@ extern unsigned long align(unsigned long,unsigned long);
 extern unsigned long comalign(unsigned long,unsigned long);
 extern int shiftcnt(uint32_t);
 extern int lshiftcnt(lword);
+extern int highest_bit_set(lword);
 extern lword sign_extend(lword,int);
 void add_symnames(struct SymNames **,const char *);
 #endif
@@ -819,10 +823,13 @@ extern void fixlnksymbols(struct GlobalVars *,struct LinkedSection *);
 extern struct Symbol *find_any_symbol(struct GlobalVars *,
                                       struct Section *,const char *);
 extern void reenter_global_objsyms(struct GlobalVars *,struct ObjectUnit *);
+extern struct RelocInsert *initRelocInsert(struct RelocInsert *,
+                                           uint16_t,uint16_t,lword);
 extern struct Reloc *newreloc(struct GlobalVars *,struct Section *,
                               const char *,struct Section *,uint32_t,
                               unsigned long,uint8_t,lword);
 extern void addreloc(struct Section *,struct Reloc *,uint16_t,uint16_t,lword);
+extern void addreloc_ri(struct Section *,struct Reloc *,struct RelocInsert *);
 extern bool isstdreloc(struct Reloc *,uint8_t,uint16_t);
 extern struct Reloc *findreloc(struct Section *,unsigned long);
 extern void addstabs(struct ObjectUnit *,struct Section *,char *,
@@ -832,7 +839,7 @@ extern struct TargetExt *addtargetext(struct Section *,uint8_t,uint8_t,uint16_t,
                                       uint32_t);
 extern bool checktargetext(struct LinkedSection *,uint8_t,uint8_t);
 extern lword readsection(struct GlobalVars *,uint8_t,uint8_t *,
-                         uint16_t,uint16_t,lword);
+                         struct RelocInsert *);
 extern lword writesection(struct GlobalVars *,uint8_t *,struct Reloc *,lword);
 extern void calc_relocs(struct GlobalVars *,struct LinkedSection *);
 extern void sort_relocs(struct list *);

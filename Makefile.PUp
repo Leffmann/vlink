@@ -2,6 +2,7 @@
 
 TARGET = vlink_pup
 DIR = PowerUp
+MD = makedir
 
 CC = vc +powerup
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

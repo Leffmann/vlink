@@ -1,11 +1,11 @@
-/* $VER: vlink t_vobj.c V0.14d (12.02.14)
+/* $VER: vlink t_vobj.c V0.15b (08.07.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2014  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2014 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -252,7 +252,6 @@ static void read_section(struct GlobalVars *gv,struct ObjectUnit *u,
   struct Reloc *last_reloc;
   int last_sym = -1;
   lword last_offs;
-  uint16_t last_bpos = INVALID;
 
   skip_string();  /* section name */
   for (attr=(char *)p; *attr; attr++) {
@@ -326,8 +325,7 @@ static void read_section(struct GlobalVars *gv,struct ObjectUnit *u,
               vsyms[sym_idx].name,(int)vsyms[sym_idx].type);
       }
 
-      if (sym_idx==last_sym && offs==last_offs && bpos==last_bpos &&
-          last_reloc!=NULL) {
+      if (sym_idx==last_sym && offs==last_offs && last_reloc!=NULL) {
         r = last_reloc;
       }
       else {
@@ -335,7 +333,6 @@ static void read_section(struct GlobalVars *gv,struct ObjectUnit *u,
         r->flags |= flags;
         last_reloc = r;
         last_offs = offs;
-        last_bpos = bpos;
         last_sym = sym_idx;
       }
 

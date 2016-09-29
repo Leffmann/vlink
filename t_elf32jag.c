@@ -1,11 +1,11 @@
-/* $VER: vlink t_elf32jag.c V0.15a (22.01.15)
+/* $VER: vlink t_elf32jag.c V0.15b (17.08.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -87,23 +87,23 @@ static uint8_t jag_reloc_elf2vlink(uint8_t rtype,struct RelocInsert *ri)
     R_ABS,6,5,0x1f,             /* R_JAG_ABS5 */
     R_PC,6,5,0x1f,              /* R_JAG_REL5 */
     R_PC,6,5,0x3e,              /* R_JAG_JR */
-    R_ABS,0,32,0,               /* R_JAG_ABS32SWP */
-    R_PC,0,32,0                 /* R_JAG_REL32SWP */
+    R_ABS,16,16,0xffff0000,     /* R_JAG_ABS32SWP */
+    R_PC,16,16,0xffff0000       /* R_JAG_REL32SWP */
   };
 
   if (rtype <= R_JAG_REL32SWP) {
     ri->bpos = convert[rtype].bpos;
     ri->bsiz = convert[rtype].bsiz;
-    if ((ri->mask = convert[rtype].mask) == 0) {
-      /* R_JAG_xxxSWP - add a second RelocInsert */
-      ri->next = &ri2;
-      ri->mask = 0xffff0000;
-      ri2.bpos = ri->bpos + 16;
-      ri2.bsiz = ri->bsiz;
-      ri2.mask = 0xffff;
-      ri2.next = NULL;
-    }
+    ri->mask = convert[rtype].mask;
     rtype = convert[rtype].rtype;
+
+    if (ri->mask == 0xffff0000) {
+      /* R_JAG_xxxSWP - add a second RelocInsert */
+      ri2 = *ri;
+      ri2.bpos = 0;
+      ri2.mask = 0xffff;
+      ri->next = &ri2;
+    }
   }
   else
     rtype = R_NONE;

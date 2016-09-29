@@ -2,6 +2,7 @@
 
 TARGET = vlink_os4
 DIR = AmigaOS4
+MD = makedir
 
 CC = vc +aosppc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

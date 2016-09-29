@@ -1,11 +1,11 @@
-/* $VER: vlink t_elf32.c V0.14 (29.07.11)
+/* $VER: vlink t_elf32.c V0.15b (08.07.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2011  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2011 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -204,7 +204,7 @@ static void elf32_dynrefs(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
     struct Elf32_Sym *sym = elf32_symtab(lf,ehdr,symndx) +
                             ELF32_R_SYM(read32(be,elfrel->r_info));
     uint32_t shndx = (uint32_t)read16(be,sym->st_shndx);
-    struct RelocInsert ri,*ri_ptr;
+    struct RelocInsert ri;
     uint8_t rtype;
 
     if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
@@ -215,8 +215,7 @@ static void elf32_dynrefs(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
       r = newreloc(gv,sec,elf32_strtab(lf,ehdr,read32(be,symhdr->sh_link))
                    + read32(be,sym->st_name),
                    NULL,0,read32(be,elfrel->r_offset),rtype,0);
-      for (ri_ptr=&ri; ri_ptr; ri_ptr=ri_ptr->next)
-        addreloc(sec,r,ri_ptr->bpos,ri_ptr->bsiz,ri_ptr->mask);
+      addreloc_ri(sec,r,&ri);
 
       /* referenced symbol is weak? */
       if (ELF32_ST_BIND(*sym->st_info)==STB_WEAK)
@@ -268,7 +267,7 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
     char *xrefname = NULL;
     struct Section *relsec=NULL;
     struct Reloc *r;
-    struct RelocInsert ri,*ri_ptr;
+    struct RelocInsert ri;
     lword a;
     uint8_t rtype;
 
@@ -281,7 +280,7 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
     if (is_rela)
       a = (int32_t)read32(be,elfrel->r_addend);
     else
-      a = (int32_t)readsection(gv,rtype,sec->data+offs,ri.bpos,ri.bsiz,ri.mask);
+      a = (int32_t)readsection(gv,rtype,sec->data+offs,&ri);
 
     if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
       /* undefined or common symbol - create external reference */
@@ -307,8 +306,7 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
              ELF32_ST_TYPE(*sym->st_info));
 
     r = newreloc(gv,sec,xrefname,relsec,0,(unsigned long)offs,rtype,a);
-    for (ri_ptr=&ri; ri_ptr; ri_ptr=ri_ptr->next)
-      addreloc(sec,r,ri_ptr->bpos,ri_ptr->bsiz,ri_ptr->mask);
+    addreloc_ri(sec,r,&ri);
 
     /* referenced symbol is weak? */
     if (xrefname!=NULL && ELF32_ST_BIND(*sym->st_info)==STB_WEAK)

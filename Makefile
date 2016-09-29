@@ -2,6 +2,7 @@
 
 TARGET = vlink
 DIR = objects
+MD = mkdir
 
 CC = gcc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

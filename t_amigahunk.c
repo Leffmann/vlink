@@ -423,11 +423,14 @@ static bool addlongrelocs(struct GlobalVars *gv,struct HunkInfo *hi,
   uint16_t pos = 0;
   lword mask = -1;
   struct Reloc *r;
+  struct RelocInsert ri;
 
   if (size == 24) {  /* EHF/PPC 26-bit branch */
     pos = 6;
     mask = ~3;  /* 0xfffffffc */
   }
+  initRelocInsert(&ri,pos,size,mask);
+
   if (s) {
     nextword32(hi);
     while (n = nextword32(hi)) {
@@ -435,8 +438,8 @@ static bool addlongrelocs(struct GlobalVars *gv,struct HunkInfo *hi,
       while (n--) {
         offs = nextword32(hi);
         r = newreloc(gv,s,NULL,NULL,id,offs,type,
-                     readsection(gv,type,s->data+offs,pos,size,mask));
-        addreloc(s,r,pos,size,mask);
+                     readsection(gv,type,s->data+offs,&ri));
+        addreloc_ri(s,r,&ri);
       }
     }
     return TRUE;
@@ -451,6 +454,9 @@ static bool addshortrelocs32(struct GlobalVars *gv,struct HunkInfo *hi,
 {
   uint32_t n,id,offs;
   struct Reloc *r;
+  struct RelocInsert ri;
+
+  initRelocInsert(&ri,0,32,-1);
 
   if (s) {
     nextword32(hi);
@@ -459,8 +465,8 @@ static bool addshortrelocs32(struct GlobalVars *gv,struct HunkInfo *hi,
       while (n--) {
         offs = (uint32_t)nextword16(hi);
         r = newreloc(gv,s,NULL,NULL,id,offs,R_ABS,
-                     readsection(gv,R_ABS,s->data+offs,0,32,-1));
-        addreloc(s,r,0,32,-1);  /* standard 32-bit reloc */
+                     readsection(gv,R_ABS,s->data+offs,&ri));
+        addreloc_ri(s,r,&ri);
       }
     }
     alignhunkptr(hi);
@@ -577,16 +583,19 @@ static void create_xrefs(struct GlobalVars *gv,struct HunkInfo *hi,
   uint16_t pos = 0;
   lword mask = -1;
   struct Reloc *r;
+  struct RelocInsert ri;
 
   if (size == 24) {  /* EHF/PPC 26-bit branch */
     pos = 6;
     mask = ~3;  /* 0xfffffffc */
   }
+  initRelocInsert(&ri,pos,size,mask);
+
   while (n--) {
     offs = nextword32(hi);
     r = newreloc(gv,s,name,NULL,0,offs,rtype,
-                 readsection(gv,rtype,s->data+offs,pos,size,mask));
-    addreloc(s,r,pos,size,mask);
+                 readsection(gv,rtype,s->data+offs,&ri));
+    addreloc_ri(s,r,&ri);
   }
 }
 

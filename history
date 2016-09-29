@@ -14,6 +14,20 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.15b (17.09.16)
+o Reworked reading and writing of relocations. Support more complex
+  relocations.
+o Fixed inserting little-endian relocations, which only worked before when
+  the reloc-fields started and ended on byte-boundaries.
+o Do not include zero-bytes at the end of a section into the ininitalized
+  file size, for those file format which support that.
+o (elf) Fixed illegal memory access when linking an ELF program without a
+  linker script.
+o (elf32jag) Fixed MOVEI-relocation.
+o (vobj) For little-endian the bit position in a byte of a reloc-field is
+  now counted from right to left. VOBJ files by vasm-versions older than
+  V1.7f may be incompatible for complex little-endian relocations (e.g. ARM).
+
 - 0.15a (12.03.16)
 o New option -mrel instructs the linker to merge all sections with
   PC-relative references between them. This was done automatically

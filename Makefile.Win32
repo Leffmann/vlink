@@ -4,6 +4,7 @@
 
 TARGET = vlink.exe
 DIR = objects
+MD = mkdir
 
 # If Visual Studio is unable to find <windows.h> when compiling vlink, try enabling the two
 # lines below, and point them to where you have installed the Win32 Platform SDK.

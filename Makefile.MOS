@@ -2,6 +2,7 @@
 
 TARGET = vlink_mos
 DIR = MorphOS
+MD = makedir
 
 CC = vc +morphos
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

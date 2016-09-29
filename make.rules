@@ -10,7 +10,7 @@ vlinkobjects = $(DIR)/main.o $(DIR)/support.o $(DIR)/errors.o \
                $(DIR)/t_aouti386.o $(DIR)/t_aoutmint.o $(DIR)/t_ataritos.o \
                $(DIR)/t_rawbin.o $(DIR)/t_rawseg.o $(DIR)/t_vobj.o
 
-$(TARGET): $(vlinkobjects)
+$(TARGET): $(DIR) $(vlinkobjects)
 	$(CC) $(CCOUT)$(DIR)/version.o $(COPTS) $(CONFIG) version.c
 	$(LD) $(LDOUT)$(TARGET) $(LDOPTS) $(vlinkobjects) $(DIR)/version.o $(LIBS)
 
@@ -20,6 +20,9 @@ vlink.pdf: vlink.texi
 
 vlink.html: vlink.texi
 	texi2html -split=chapter -nosec_nav -frames vlink.texi
+
+$(DIR):
+	$(MD) $(DIR)
 
 $(DIR)/main.o: main.c vlink.h config.h ar.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) main.c

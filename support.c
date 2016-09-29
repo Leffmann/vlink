@@ -1,11 +1,11 @@
-/* $VER: vlink support.c V0.14a (03.09.11)
+/* $VER: vlink support.c V0.15b (27.08.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2011  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2011 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -481,35 +481,166 @@ int writetaddr(struct GlobalVars *gv,void *p,lword d)
 }
 
 
-uint32_t readbf32(bool be,void *p,int offset,int size)
-/* read value from 32-bit bitfield */
+lword readbf(bool be,void *src,int fldsiz,int pos,int siz)
+/* read value from bitfield with length fldsiz, starting at bit-position pos */
 {
-  if (size>0 && offset+size<=32) {
-    uint32_t mask=(1<<size)-1;
+  uint8_t *p = src;
+  lword d = 0;
+  int n;
 
-    return (be)?((read32be(p) >> (32-(offset+size))) & mask)
-                :((read32le(p) >> offset) & mask);
+  /* advance to start-byte (MSB) */
+  if (be)
+    p += pos >> 3;
+  else
+    p += fldsiz - (pos >> 3);
+
+  pos &= 7;
+  n = (pos + siz + 7) >> 3;  /* number of bytes to read */
+
+  if (be) {
+    while (n--) {
+      d <<= 8;
+      d |= (lword)*p++;
+    }
   }
-  ierror("readbf32(): Illegal arguments: offset=%d size=%d",offset,size);
-  return 0;
+  else {
+    while (n--) {
+      d <<= 8;
+      d |= (lword)*(--p);
+    }
+  }
+
+  /* normalize and mask the extracted bitfield */
+  d >>= (8 - ((pos + siz) & 7)) & 7;
+  return d & makemask(siz);
 }
 
 
-void writebf32(bool be,void *p,int offset,int size,uint32_t d)
-/* write value to 32-bit bitfield */
+void writebf(bool be,void *dst,int fldsiz,int pos,int siz,lword d)
+/* write value to bitfield with length fldsiz, starting at bit-position pos */
 {
-  if (size>0 && offset+size<=32) {
-    uint32_t mask=(1<<size)-1;
+  uint8_t *p = dst;
+  uint8_t m,b;
+  int n,sh;
+
+  /* advance to start-byte (LSB) */
+  if (be)
+    p += (pos + siz + 7) >> 3;
+  else
+    p += fldsiz - ((pos + siz + 7) >> 3);
+
+  pos &= 7;
+  n = (pos + siz + 7) >> 3;  /* number of bytes to write */
+
+  sh = (8 - ((pos + siz) & 7)) & 7;
+  m = 0xff << sh;  /* initial mask for LSB */
+  d <<= sh;  /* shift value to match bitfield */
+
+  while (n--) {
+    if (n == 0)
+      m &= (1 << (8 - pos)) - 1;  /* apply mask for MSB */
 
     if (be) {
-      int s = 32-(offset+size);
-      write32be(p,(read32be(p) & ~(mask<<s)) | ((d & mask) << s));
+      /* write right to left, for big-endian target */
+      b = *(--p) & ~m;
+      *p = b | ((uint8_t)d & m);
     }
-    else
-      write32le(p,(read32le(p) & ~(mask<<offset)) | ((d & mask) << offset));
+    else {
+      /* write left to right, for little-endian target */
+      b = *p & ~m;
+      *p++ = b | ((uint8_t)d & m);
+    }
+    d >>= 8;
+    m = 0xff;
+  }
+}
+
+
+lword readreloc(bool be,void *src,int pos,int siz)
+/* Read value from a relocation bitfield. Difference is that there is no
+   known total field length, so pos/8 always defines the offset to the
+   first byte, no matter if LE or BE. Then follow ((pos&7)+siz+7)/8 bytes
+   read in LE or BE format. Note that the bits in a byte are counted from
+   highest to lowest for BE and from lowest to highest for LE! */
+{
+  uint8_t *p = src;
+  lword d = 0;
+  int n;
+
+  /* advance to start-byte (MSB for BE, LSB for LE) */
+  p += pos >> 3;
+
+  pos &= 7;
+  n = (pos + siz + 7) >> 3;  /* number of bytes to read */
+
+  if (be) {
+    while (n--) {
+      d <<= 8;
+      d |= (lword)*p++;
+    }
+    /* normalize BE */
+    d >>= (8 - ((pos + siz) & 7)) & 7;
+  }
+  else {
+    p += n;
+    while (n--) {
+      d <<= 8;
+      d |= (lword)*(--p);
+    }
+    /* normalize LE */
+    d >>= pos;
+  }
+
+  /* mask the extracted bitfield */
+  return d & makemask(siz);
+}
+
+
+void writereloc(bool be,void *dst,int pos,int siz,lword d)
+/* Write value to a relocation bitfield. Difference is that there is no
+   known total field length, so pos/8 always defines the offset to the
+   first byte, no matter if LE or BE. Then follow ((pos&7)+siz+7)/8 bytes
+   written in LE or BE format. Note that the bits in a byte are counted from
+   highest to lowest for BE and from lowest to highest for LE! */
+{
+  uint8_t *p = dst;
+  uint8_t m,b;
+  int n,sh;
+
+  /* advance to start-byte (MSB for BE, LSB for LE) */
+  p += pos >> 3;
+
+  pos &= 7;
+  n = (pos + siz + 7) >> 3;  /* number of bytes to write */
+
+  if (be) {
+    p += n;  /* we start with the LSB, so move behind it */
+    sh = (8 - ((pos + siz) & 7)) & 7;
   }
   else
-    ierror("writebf32(): Illegal arguments: offset=%d size=%d",offset,size);
+    sh = pos;
+
+  m = 0xff << sh;  /* initial mask for LSB */
+  d <<= sh;        /* shift value to match bitfield */
+
+  while (n--) {
+    if (be) {
+      /* write right to left, for big-endian target */
+      if (n == 0)
+        m &= (1 << (8 - pos)) - 1;  /* apply mask for MSB */
+      b = *(--p) & ~m;
+      *p = b | ((uint8_t)d & m);
+    }
+    else {
+      /* write left to right, for little-endian target */
+      if (n == 0)
+        m &= (2 << ((pos + siz - 1) & 7)) - 1;  /* apply mask for MSB */
+      b = *p & ~m;
+      *p++ = b | ((uint8_t)d & m);
+    }
+    d >>= 8;
+    m = 0xff;
+  }
 }
 
 
@@ -666,6 +797,20 @@ int lshiftcnt(lword x)
     x >>= 1;
   }
   return i;
+}
+
+
+int highest_bit_set(lword x)
+/* return number of highest bit set */
+{
+  int i,h=-1,n=sizeof(lword)<<3;
+
+  for (i=0; i<n; i++) {
+    if (x & 1)
+      h = i;
+    x >>= 1;
+  }
+  return h;
 }
 
 

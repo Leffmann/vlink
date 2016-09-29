@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.15a (04.02.16)
+/* $VER: vlink targets.c V0.15b (08.07.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -707,6 +707,19 @@ void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
 }
 
 
+struct RelocInsert *initRelocInsert(struct RelocInsert *ri,uint16_t pos,
+                                    uint16_t siz,lword msk)
+{
+  if (ri == NULL)
+    ri = alloc(sizeof(struct RelocInsert));
+  ri->next = NULL;
+  ri->bpos = pos;
+  ri->bsiz = siz;
+  ri->mask = msk;
+  return ri;
+}
+
+
 struct Reloc *newreloc(struct GlobalVars *gv,struct Section *sec,
                        const char *xrefname,struct Section *rs,uint32_t id,
                        unsigned long offset,uint8_t rtype,lword addend)
@@ -748,14 +761,10 @@ void addreloc(struct Section *sec,struct Reloc *r,
    which will be inserted into the sections reloc list, if not
    already done. */
 {
-  struct RelocInsert *new = alloc(sizeof(struct RelocInsert));
-  struct RelocInsert *ri = r->insert;
+  struct RelocInsert *ri,*new;
 
-  new->next = NULL;
-  new->bpos = pos;
-  new->bsiz = siz;
-  new->mask = mask;
-  if (ri) {
+  new = initRelocInsert(NULL,pos,siz,mask);
+  if (ri = r->insert) {
     while (ri->next)
       ri = ri->next;
     ri->next = new;
@@ -768,6 +777,17 @@ void addreloc(struct Section *sec,struct Reloc *r,
       addtail(&sec->xrefs,&r->n);  /* add to current section's XRef list */
     else
       addtail(&sec->relocs,&r->n);  /* add to current section's Reloc list */
+  }
+}
+
+
+void addreloc_ri(struct Section *sec,struct Reloc *r,struct RelocInsert *ri)
+/* Call addreloc with information from the supplied RelocInsert structure.
+   May result in multiple addreloc-calls. */
+{
+  while (ri != NULL) {
+    addreloc(sec,r,ri->bpos,ri->bsiz,ri->mask);
+    ri = ri->next;
   }
 }
 
@@ -879,49 +899,43 @@ bool checktargetext(struct LinkedSection *ls,uint8_t id,uint8_t subid)
 }
 
 
-lword readsection(struct GlobalVars *gv,uint8_t rtype,uint8_t *p,
-                  uint16_t bpos,uint16_t bsiz,lword mask)
-/* Read data from section at 'p', using bit-offset 'bpos' and a field-size
-   of 'bsiz' bits. The result is denormalized using the supplied mask.
-   Complex RelocInsert scenarios are not supported, but this doesn't
-   matter as those relocations have their addend information available
-   anyway (ELF: .rela section) and don't need to read it from a section. */
+lword readsection(struct GlobalVars *gv,uint8_t rtype,uint8_t *src,
+                  struct RelocInsert *ri)
+/* Read data from section at 'src', using the field-offsets, sizes and masks
+   from the supplied list of RelocInsert structures. */
 {
-  lword v = 0;
-  int n;
+  int be = gv->endianess != _LITTLE_ENDIAN_;
+  int maxfldsz = 0;
+  lword data = 0;
 
-  p += bpos >> 3;
-  bpos &= 7;
+  while (ri != NULL) {
+    lword mask = ri->mask;
+    lword v;
+    int n;
 
-  if (n = (bpos + bsiz + 7) >> 3) {
-    if (gv->endianess == _LITTLE_ENDIAN_) {
-      p += n;
-      while (n--) {
-        v <<= 8;
-        v |= (lword)*(--p);
-      }
-      v >>= bpos;  /* normalize extracted bit-field */
-    }
-    else {  /* _BIG_ENDIAN_ or undefined */
-      while (n--) {
-        v <<= 8;
-        v |= (lword)*p++;
-      }
-      v >>= (8 - ((bpos + bsiz) & 7)) & 7; /* normalize extracted bit-field */
-    }
-    v &= makemask(bsiz);
+    n = highest_bit_set(mask) + 1;
+    if (n > maxfldsz)
+      maxfldsz = n;
+
+    /* read from bitfield */
+    v = readreloc(be,src,ri->bpos,ri->bsiz);
 
     /* mask and denormalize the read value using 'mask' */
     n = lshiftcnt(mask);
     mask >>= n;
     v &= mask;
-    if (rtype==R_SD || rtype==R_SD2 || rtype==R_SD21)
-      v <<= n;
-    else
-      v = sign_extend(v,(int)bsiz) << n;  /* sign-extend */
+    v <<= n;
+
+    /* add to data value, next RelocInsert */
+    data += v;
+    ri = ri->next;
   }
 
-  return v;
+  /* sign-extend, when needed */
+  if (rtype!=R_SD && rtype!=R_SD2 && rtype!=R_SD21)
+    return sign_extend(data,maxfldsz);
+
+  return data;
 }
 
 
@@ -931,80 +945,42 @@ lword writesection(struct GlobalVars *gv,uint8_t *dest,struct Reloc *r,lword v)
    Returns 0 on success or the masked and normalized value which failed
    on the range check. */
 {
+  bool be = gv->endianess != _LITTLE_ENDIAN_;
+  uint8_t t = r->rtype;
+  bool signedval = t==R_PC||t==R_GOTPC||t==R_GOTOFF||t==R_PLTPC||t==R_PLTOFF||
+                   t==R_SD||t==R_SD2||t==R_SD21||t==R_MOSDREL;
   struct RelocInsert *ri;
 
-  if (r->rtype == R_NONE)
+  if (t == R_NONE)
     return 0;
 
-  if (ri = r->insert) {
-    lword lastval = 0;  /* add reloc-addends to this value */
-    uint8_t t = r->rtype;
-    bool signedval = t==R_PC||t==R_GOTPC||t==R_GOTOFF||t==R_PLTPC||t==R_PLTOFF
-                     ||t==R_SD||t==R_SD2||t==R_SD21||t==R_MOSDREL;
-    bool be = gv->endianess == _BIG_ENDIAN_;
+  /* Reset all relocation fields to zero. */
+  for (ri=r->insert; ri!=NULL; ri=ri->next)
+    writereloc(be,dest,ri->bpos,ri->bsiz,0);
 
-    do {
-      /* first mask and normalize the value, then check if it
-         fits into the bitfield */
-      lword mask = ri->mask;
-      lword insval = v & mask;
-      uint8_t *p = dest + (ri->bpos >> 3);
-      int bpos = (int)ri->bpos & 7;
-      int bsiz = (int)ri->bsiz;
-      int n;
+  /* add value to relocation fields */
+  for (ri=r->insert; ri!=NULL; ri=ri->next) {
+    lword mask = ri->mask;
+    lword insval = v & mask;
+    lword oldval;
+    int bpos = ri->bpos;
+    int bsiz = ri->bsiz;
 
-      insval >>= lshiftcnt(mask);  /* normalize according mask */
-      if (mask>=0 && signedval)
-        insval = sign_extend(insval,bsiz);
-      insval += lastval;
-      lastval = insval;
-      if (!checkrange(insval,signedval,bsiz))
-        return insval;  /* range check failed on 'insval' */
+    insval >>= lshiftcnt(mask);  /* normalize according mask */
+    if (mask>=0 && signedval)
+      insval = sign_extend(insval,bsiz);
 
-      /* insert into bitfield, obeying target endianess */
-      if (n = (bpos + bsiz + 7) >> 3) {
-        if (be) {  /* write for big-endian target */
-          int sh = (8 - ((bpos + bsiz) & 7)) & 7;
-          uint8_t m = 0xff << sh;  /* mask for LSB */
-          uint8_t b;
+    if (!checkrange(insval,signedval,bsiz))
+      return insval;  /* range check failed on 'insval' */
 
-          insval <<= sh;  /* shift to fit bitfield */
-          p += n;
-          while (n--) {
-            if (!n)
-              m &= (1 << (8-(bpos&7))) - 1;  /* apply mask for MSB */
-
-            b = *(--p) & ~m;
-            *p = b | ((uint8_t)insval & m);
-            insval >>= 8;
-            m = 0xff;
-          }
-        }
-        else {  /* write for little-endian target */
-          uint8_t m = 0xff << bpos;  /* mask for LSB */
-          uint8_t b;
-
-          insval <<= bpos;  /* shift to fit bitfield */
-          while (n--) {
-            if (!n && ((bpos+bsiz)&7)!=0)
-              m &= (1 << ((bpos+bsiz)&7)) - 1;  /* apply mask for MSB */
-
-            b = *p & ~m;
-            *p++ = b | ((uint8_t)insval & m);
-            insval >>= 8;
-            m = 0xff;
-          }
-        }
-      }
-    }
-    while (ri = ri->next);
-
-    return 0;
+    /* add to value already present in this field */
+    oldval = readreloc(be,dest,bpos,bsiz);
+    if (mask>=0 && signedval)
+      oldval = sign_extend(oldval,bsiz);
+    writereloc(be,dest,bpos,bsiz,oldval+insval);
   }
 
-  ierror("writesection(): Reloc (type=%d offs=%lu add=%lld) without "
-         " insert field def.\n",(int)r->rtype,r->offset,r->addend);
-  return -1;
+  return 0;
 }
 
 
@@ -1562,6 +1538,8 @@ struct SecAttrOvr *getsecattrovr(struct GlobalVars *gv,const char *name,
 {
   struct SecAttrOvr *sao;
 
+  if (name == NULL)
+    name = noname;
   for (sao=gv->secattrovrs; sao!=NULL; sao=sao->next) {
     if (!strcmp(sao->name,name) && (sao->flags & flags)!=0)
       break;

@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.15a (27.02.16)
+/* $VER: vlink linker.c V0.15b (10.07.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -752,6 +752,21 @@ static void init_dynlink(struct GlobalVars *gv)
 }
 
 
+static void set_last_sec_reloc(struct Section *s,struct Reloc *r)
+/* Check if Reloc is the new last relocation in this section and remember
+   the offset behind its relocation field. */
+{
+  struct RelocInsert *ri;
+  unsigned long rend;
+
+  for (ri=r->insert; ri!=NULL; ri=ri->next) {
+    rend = r->offset + (ri->bpos + ri->bsiz + 7) / 8;
+    if (rend > s->last_reloc)
+      s->last_reloc = rend;
+  }
+}
+
+
 void linker_init(struct GlobalVars *gv)
 {
   initlist(&gv->linkfiles);
@@ -1114,6 +1129,9 @@ void linker_relrefs(struct GlobalVars *gv)
       for (*rr=NULL,xref=(struct Reloc *)sec->xrefs.first;
            xref->n.next!=NULL; xref=(struct Reloc *)xref->n.next) {
 
+        /* remember offset of sections's last xref */
+        set_last_sec_reloc(sec,xref);
+
         if (xdef = xref->relocsect.symbol) {
           if (xdef->relsect!=NULL &&
               (xdef->type==SYM_RELOC || xdef->type==SYM_COMMON)) {
@@ -1141,6 +1159,9 @@ void linker_relrefs(struct GlobalVars *gv)
 
       for (reloc=(struct Reloc *)sec->relocs.first;
            reloc->n.next!=NULL; reloc=(struct Reloc *)reloc->n.next) {
+
+        /* remember offset of sections's last reloc */
+        set_last_sec_reloc(sec,reloc);
 
         if (reloc->rtype==R_PC && reloc->relocsect.ptr!=sec) {
           /* relative reference to different section */
@@ -1523,6 +1544,29 @@ void linker_join(struct GlobalVars *gv)
           ls->size += n;
           if (baseincr)
             va += n;
+        }
+      }
+    }
+  }
+
+  /* Remove zero-bytes at the end of a section from filesize in executables */
+  if (!gv->dest_object) {
+    for (ls=(struct LinkedSection *)gv->lnksec.first;
+         ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next) {
+      for (sec=(struct Section *)ls->sections.first;
+           sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+        nextsec = (struct Section *)sec->n.next;
+        if (!(sec->flags & SF_UNINITIALIZED) &&
+            (nextsec->n.next==NULL || (nextsec->flags & SF_UNINITIALIZED))) {
+          /* This is the last initialized sub-section, so check for
+             trailing zero-bytes, which can be subtracted from filesize. */
+          unsigned long secinit = sec->size;
+          uint8_t *p = sec->data + secinit;
+
+          while (secinit>sec->last_reloc && *(--p)==0)
+            --secinit;
+          ls->filesize = sec->offset + secinit;
+          break;
         }
       }
     }

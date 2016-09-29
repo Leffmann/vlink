@@ -1,11 +1,11 @@
-/* $VER: vlink elf.c V0.14 (29.07.11)
+/* $VER: vlink elf.c V0.15b (17.04.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2011  Frank Wille
+ * Copyright (c) 1997-2016  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2011 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -1352,6 +1352,7 @@ void elf_initoutput(struct GlobalVars *gv,
     /* we need to provide at least one dummy PHDR, even for reloc-objects */
     struct Phdr *p = alloczero(sizeof(struct Phdr));
 
+    p->name = " dummy";
     p->type = PT_LOAD;
     p->flags = PF_X|PF_W|PF_R|PHDR_USED;
     p->mem_end = p->file_end = 0xffffffff;
