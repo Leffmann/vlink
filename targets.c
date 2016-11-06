@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.15b (08.07.16)
+/* $VER: vlink targets.c V0.15c (16.10.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -913,7 +913,7 @@ lword readsection(struct GlobalVars *gv,uint8_t rtype,uint8_t *src,
     lword v;
     int n;
 
-    n = highest_bit_set(mask) + 1;
+    n = mask==-1 ? (int)ri->bsiz : highest_bit_set(mask) + 1;
     if (n > maxfldsz)
       maxfldsz = n;
 

@@ -14,6 +14,10 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.15c (01.11.16)
+o Fixed problems with relocation addend sign-extension, introduced in
+  the last version.
+
 - 0.15b (17.09.16)
 o Reworked reading and writing of relocations. Support more complex
   relocations.
