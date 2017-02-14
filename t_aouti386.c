@@ -67,6 +67,7 @@ struct FFFuncs fff_aoutbsdi386 = {
   "aoutbsdi386",
   zmagic_exe,
   NULL,
+  NULL,
   aout_headersize,
   aoutbsdi386_identify,
   aoutstd_readconv,
@@ -97,6 +98,7 @@ static int aoutpc386_identify(char *,uint8_t *,unsigned long,bool);
 struct FFFuncs fff_aoutpc386 = {
   "aoutpc386",
   zmagic_exe,
+  NULL,
   NULL,
   aout_headersize,
   aoutpc386_identify,

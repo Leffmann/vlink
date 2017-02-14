@@ -87,6 +87,7 @@ struct FFFuncs fff_vobj_le = {
   "vobj-le",
   NULL,
   NULL,
+  NULL,
   vobj_headersize,
   vobjle_identify,
   vobj_readconv,
@@ -111,6 +112,7 @@ struct FFFuncs fff_vobj_le = {
 
 struct FFFuncs fff_vobj_be = {
   "vobj-be",
+  NULL,
   NULL,
   NULL,
   vobj_headersize,

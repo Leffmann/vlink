@@ -1,11 +1,11 @@
-/* $VER: vlink version.c V0.15c (16.10.16)
+/* $VER: vlink version.c V0.15d (06.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -15,7 +15,7 @@
 
 
 /* version/revision */
-#define VERSION "0.15c"
+#define VERSION "0.15d"
 
 #define VERSION_C
 #include "vlink.h"
@@ -29,7 +29,7 @@ static const char *_ver = "$VER: " PNAME " " VERSION " " __AMIGADATE__ "\r\n";
 
 void show_version(void)
 {
-  printf(PNAME " V" VERSION " (c)1997-2016 by Frank Wille\n"
+  printf(PNAME " V" VERSION " (c)1997-2017 by Frank Wille\n"
          "build date: " __DATE__ ", " __TIME__ "\n\n");
 }
 
@@ -38,21 +38,23 @@ void show_usage(void)
 {
   show_version();
 
-  printf("Usage: " PNAME " [-dhnqrstvwxMRSX] [-B linkmode] [-b targetname] "
+  printf("Usage: " PNAME " [-dhnqrstvwxMRSXZ] [-B linkmode] [-b targetname] "
          "[-baseoff offset] [-C constructor-type] "
 #if 0 /* not implemented */
          "[-D symbol[=value]] "
 #endif
          "[-da] [-dc] [-dp] [-EB] [-EL] [-e entrypoint] [-export-dynamic] "
          "[-f flavour] [-fixunnamed] [-F filename] "
+         "[-gc-all] [-gc-empty] "
          "[-hunkattr secname=value] [-interp path] "
          "[-L library-search-path] [-l library-specifier] [-minalign value] "
-         "[-mrel] [-multibase] [-nostdlib] [-o filename] [-osec] "
+         "[-mrel] [-multibase] [-nostdlib] "
+         "[-o filename] [-osec] [-P symbol] "
          "[-rpath path] [-sc] [-sd] [-shared] [-soname name] [-static] "
          "[-T filename] [-Ttext addr] [-textbaserel] "
          "[-tos-flags/fastload/fastram/private/global/super/readable] "
          "[-u symbol] "
-         "[-V version] [-y symbol] [-P symbol] "
+         "[-V version] [-y symbol] "
          "input-files...\n\nOptions:\n"
 
          "<input-files>     object files and libraries to link\n"
@@ -65,6 +67,8 @@ void show_usage(void)
          "-rpath<path>      add search path for dynamic linker\n"
          "-e<entrypoint>    address of program's entry point\n"
          "-interp <path>    set interpreter path (dynamic linker for ELF)\n"
+         "-gc-all           garbage-collect all unreferenced sections\n"
+         "-gc-empty         garbage-collect empty unreferenced sections\n"
          "-y<symbol>        trace symbol accesses by the linker\n"
          "-P<symbol>        protect symbol from stripping\n"
 #if 0 /* not implemented */
@@ -92,6 +96,7 @@ void show_usage(void)
          "-Rstd             standard relocation table\n"
          "-Radd             relocation table with addends\n"
          "-Rshort           relocation table with short offsets\n"
+         "-Z                keep trailing zero-bytes in executables\n"
          "-d                force allocation of common symbols (also -dc,-dp)\n"
          "-da               force allocation of address symbols (PowerOpen)\n"
          "-sc               merge all code sections\n"

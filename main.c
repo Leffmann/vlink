@@ -1,11 +1,11 @@
-/* $VER: vlink main.c V0.15a (09.12.15)
+/* $VER: vlink main.c V0.15d (09.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -172,6 +172,11 @@ int main(int argc,char *argv[])
   gv->soname = NULL;
   gv->endianess = -1;  /* endianess is unknown */
 
+  /* initialize targets */
+  for (j=0; fff[j]; j++) {
+    if (fff[j]->init)
+      fff[j]->init(gv);
+  }
 #ifdef DEFTARGET
   for (j=0; fff[j]; j++) {
     if (!strcmp(fff[j]->tname,DEFTARGET)) {
@@ -277,6 +282,15 @@ int main(int argc,char *argv[])
               gv->flavours.flavours_len += strlen(name) + 1;
             }
           }
+          break;
+
+        case 'g':
+          if (!strcmp(&argv[i][2],"c-empty"))
+            gv->gc_sects = GCS_EMPTY;
+          else if (!strcmp(&argv[i][2],"c-all"))
+            gv->gc_sects = GCS_ALL;
+          else
+            error(2,argv[i]);  /* unrecognized option */
           break;
 
         case 'h':
@@ -609,6 +623,10 @@ int main(int argc,char *argv[])
           gv->discard_local = DISLOC_TMP;
           break;
 
+        case 'Z':  /* keep trailing zero-bytes at end of section */
+          gv->keep_trailing_zeros = TRUE;
+          break;
+
         default:
           error(2,argv[i]);  /* unrecognized option */
           break;
@@ -646,9 +664,12 @@ int main(int argc,char *argv[])
   linker_resolve(gv);  /* resolve symbol references */
   linker_relrefs(gv);  /* find all relative references between sections */
   linker_dynprep(gv);  /* prepare for dynamic linking */
+  linker_sectrefs(gv); /* find all referenced sections from the start */
+  linker_gcsects(gv);  /* section garbage collection (gc_sects) */
   linker_join(gv);     /* join sections with same name and type */
   linker_mapfile(gv);  /* mapfile output */
   linker_copy(gv);     /* copy section contents and fix symbol offsets */
+  linker_delunused(gv);/* delete empty/unused sects. without relocs/symbols */
   linker_relocate(gv); /* relocate addresses in joined sections */
   linker_write(gv);    /* write output file in selected target format */
   linker_cleanup(gv);

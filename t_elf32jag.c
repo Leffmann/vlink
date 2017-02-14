@@ -32,6 +32,7 @@ struct FFFuncs fff_elf32jag = {
   "elf32jag",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   jag_identify,
   jag_readconv,

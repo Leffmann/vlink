@@ -37,6 +37,7 @@ struct FFFuncs fff_elf32ppcbe = {
   "elf32ppcbe",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   ppc32be_identify,
   ppc32be_readconv,
@@ -77,6 +78,7 @@ struct FFFuncs fff_elf32powerup = {
   "elf32powerup",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   ppc32be_identify,
   ppc32be_readconv,
@@ -104,6 +106,7 @@ struct FFFuncs fff_elf32morphos = {
   "elf32morphos",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   ppc32be_identify,
   ppc32be_readconv,
@@ -129,6 +132,7 @@ struct FFFuncs fff_elf32morphos = {
 
 struct FFFuncs fff_elf32amigaos = {
   "elf32amigaos",
+  NULL,
   NULL,
   NULL,
   elf32_headersize,

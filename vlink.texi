@@ -12,7 +12,7 @@
 @ifinfo
 This is the manual for the portable multi-format linker vlink.
 
-Copyright 1997-2016 Frank Wille
+Copyright 1997-2017 Frank Wille
 @end ifinfo
 
 @titlepage
@@ -43,7 +43,7 @@ output.
 
 @section Legal
 @command{vlink} is freeware and part of the portable and retargetable ANSI C
-compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
 
 @command{vlink} may be freely redistributed as long as no modifications are
 made and nothing is charged for it. Non-commercial usage is allowed
@@ -86,6 +86,24 @@ The number of output file formats included is configurable at compile time.
 The following file formats are supported:
 
 @table @code
+
+@item a.out
+Currently supported:
+@itemize @minus
+  @item aoutnull (Default with standard relocs and undefined endianess)
+  @item aoutbsd68k (NetBSD/68k)
+  @item aoutbsd68k4k (NetBSD/68k 4K page size)
+  @item aoutsun010 (SunOS 68010 and AmigaOS/Atari 68000/010)
+  @item aoutsun020 (SunOS 68020 and AmigaOS/Atari 68020-68060)
+  @item aoutbsdi386 (NetBSD/i386)
+  @item aoutpc386
+  @item aoutmint (Embeds a.out in TOS format for Atari MiNT executables)
+  @item aoutjaguar (M68k with special, word-swapped RISC relocations)
+@end itemize
+Small data offset: @code{0x8000} (unused).
+Linker symbols:
+@code{__GLOBAL_OFFSET_TABLE_}, @code{__PROCEDURE_LINKAGE_TABLE_},
+@code{__DYNAMIC}.
 
 @item amigahunk
 The AmigaDos hunk format for M68k. Requires AmigaOS 2.04 with
@@ -142,11 +160,22 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 Absolute raw binary output, similar to rawbin2, but with a header
 for Commodore 8-bit computers (PET, VIC-20, 64, etc.).
 
-@item elf32m68k
-ELF (executable linkable format) for Motorola M68k, 32-bit,
-big endian. Small data offset: @code{0x8000}. Linker symbols:
-@code{_SDA_BASE_}. Automatic constructor/destructor function
-tables will be placed into the sections @code{.ctors} and @code{.dtors}.
+@item elf32amigaos
+Identical to elf32ppcbe, but when doing dynamic linking it requires that
+also all references from shared objects are resolved at link time. This
+is due to a limitation of the AmigaOS4 dynamic link editor (elf.library).
+
+@item elf32arm
+ELF (executable linkable format) for the ARM architecture.
+32-bit, little endian. Small data offset: @code{0x1000}. Linker
+Symbols: @code{_SDA_BASE_}. Automatic constructor/destructor
+function tables will be placed into the sections @code{.ctors}
+and @code{.dtors}. Supports @option{-Rstd} and @option{-Radd}.
+
+@item elf32aros
+ELF i386 32-bit little endian like elf32i386, but generates
+relocatable object files as executables. This format is
+used for the AROS (Amiga Research OS) operating system.
 Supports @option{-Rstd} and @option{-Radd}.
 
 @item elf32i386
@@ -156,25 +185,24 @@ function tables will be placed into the sections
 @code{.ctors} and @code{.dtors}.
 Supports @option{-Rstd} and @option{-Radd}.
 
-@item elf32aros
-ELF i386 32-bit little endian like elf32i386, but generates
-relocatable object files as executables. This format is
-used for the AROS (Amiga Research OS) operating system.
+@item elf32jag
+ELF (executable linkable format) for Atari Jaguar RISC, 32-bit,
+big endian. Small data offset: @code{0}. Linker symbols:
+@code{_SDA_BASE_}. Automatic constructor/destructor function
+tables will be placed into the sections @code{.ctors} and @code{.dtors}.
 Supports @option{-Rstd} and @option{-Radd}.
 
-@item elf32arm
-ELF (executable linkable format) for the ARM architecture.
-32-bit, little endian. Small data offset: @code{0x1000}. Linker
-Symbols: @code{_SDA_BASE_}. Automatic constructor/destructor
-function tables will be placed into the sections @code{.ctors}
-and @code{.dtors}. Supports @option{-Rstd} and @option{-Radd}.
-
-@item elf32ppcbe
-ELF (executable linkable format) for PowerPC, 32-bit,
+@item elf32m68k
+ELF (executable linkable format) for Motorola M68k, 32-bit,
 big endian. Small data offset: @code{0x8000}. Linker symbols:
-@code{_SDA_BASE_} and @code{_SDA2_BASE} (EABI only). Automatic
-constructor/destructor function tables will be placed into the
-sections @code{.ctors} and @code{.dtors}.
+@code{_SDA_BASE_}. Automatic constructor/destructor function
+tables will be placed into the sections @code{.ctors} and @code{.dtors}.
+Supports @option{-Rstd} and @option{-Radd}.
+
+@item elf32morphos
+Nearly identical to elf32powerup. Only difference is that
+@code{.sdata} and @code{.sbss} sections will not be merged as the MorphOS
+loader will take care of it. This format is used for MorphOS.
 
 @item elf32powerup
 ELF PowerPC 32-bit big endian like elf32ppcbe, but generates
@@ -185,22 +213,12 @@ Small data offset: @code{0x8000}.
 This format was also called @code{elf32amiga} in former @command{vlink}
 versions.
 
-@item elf32morphos
-Nearly identical to elf32powerup. Only difference is that
-@code{.sdata} and @code{.sbss} sections will not be merged as the MorphOS
-loader will take care of it. This format is used for MorphOS.
-
-@item elf32amigaos
-Identical to elf32ppcbe, but when doing dynamic linking it requires that
-also all references from shared objects are resolved at link time. This
-is due to a limitation of the AmigaOS4 dynamic link editor (elf.library).
-
-@item elf32jag
-ELF (executable linkable format) for Atari Jaguar RISC, 32-bit,
-big endian. Small data offset: @code{0}. Linker symbols:
-@code{_SDA_BASE_}. Automatic constructor/destructor function
-tables will be placed into the sections @code{.ctors} and @code{.dtors}.
-Supports @option{-Rstd} and @option{-Radd}.
+@item elf32ppcbe
+ELF (executable linkable format) for PowerPC, 32-bit,
+big endian. Small data offset: @code{0x8000}. Linker symbols:
+@code{_SDA_BASE_} and @code{_SDA2_BASE} (EABI only). Automatic
+constructor/destructor function tables will be placed into the
+sections @code{.ctors} and @code{.dtors}.
 
 @item elf64x86
 ELF (executable linkable format) for the x86_64 architecture.
@@ -209,30 +227,14 @@ function tables will be placed into the sections
 @code{.ctors} and @code{.dtors}.
 Supports @option{-Rstd} and @option{-Radd}.
 
-@item a.out
-Currently supported:
-@itemize @minus
-  @item aoutnull (Default with standard relocs and undefined endianess)
-  @item aoutbsd68k (NetBSD/68k)
-  @item aoutbsd68k4k (NetBSD/68k 4K page size)
-  @item aoutsun010 (SunOS 68010 and AmigaOS/Atari 68000/010)
-  @item aoutsun020 (SunOS 68020 and AmigaOS/Atari 68020-68060)
-  @item aoutbsdi386 (NetBSD/i386)
-  @item aoutpc386
-  @item aoutmint (Embeds a.out in TOS format for Atari MiNT executables)
-  @item aoutjaguar (M68k with special, word-swapped RISC relocations)
-@end itemize
-Small data offset: @code{0x8000} (unused).
-Linker symbols:
-@code{__GLOBAL_OFFSET_TABLE_}, @code{__PROCEDURE_LINKAGE_TABLE_},
-@code{__DYNAMIC}.
+@item ihex
+Intel Hex format. No symbols. Output format only.
+Without a linker script, the raw binary will be relocated to base address 0.
 
-@item vobj-le
-@itemx vobj-be
-VOBJ file format, generated by the @command{vasm} assembler. VOBJ is
-a read-only object file format and is designed to support
-any little- or big-endian architecture with all their
-specific relocations.
+@item jagsrv
+Absolute raw binary output, similar to rawbin1, but with a header to make
+it load and execute via the Atari Jaguar SkunkBoard or the VirtualJaguar
+emulator.
 
 @item rawbin1
 Absolute raw binary file. The sections and base addresses
@@ -252,7 +254,7 @@ Creates a raw binary file for each segment. Segments can be defined in a
 The segment names, their base address and length are written into the output
 file while the binary files get their segment name appended to the original
 file name.
-When option @option{-q} (keep relocs) had been specified, then additional files
+When option @option{-q} (keep relocs) has been specified, then additional files
 containing the relocation offsets are created. The first word in each file
 defines the number of relocations.
 
@@ -262,9 +264,12 @@ defines the number of relocations.
 Motorola S-Record format. No symbols. Output format only.
 Without a linker script, the raw binary will be relocated to base address 0.
 
-@item ihex
-Intel Hex format. No symbols. Output format only.
-Without a linker script, the raw binary will be relocated to base address 0.
+@item vobj-le
+@itemx vobj-be
+VOBJ file format, generated by the @command{vasm} assembler. VOBJ is
+a read-only object file format and is designed to support
+any little- or big-endian architecture with all their
+specific relocations.
 
 @end table
 
@@ -274,8 +279,8 @@ Without a linker script, the raw binary will be relocated to base address 0.
   @command{vlink [-dhnqrstvwxMRSX] [-B linkmode] [-b targetname]
   [-baseoff offset] [-C constructor-type] [-da] [-dc] [-dp] [-EB] [-EL]
   [-e entrypoint] [-export-dynamic] [-f flavour] [-fixunnamed]
-  [-F filename] [-hunkattr secname=value] [-interp path]
-  [-L library-search-path] [-l library-specifier]
+  [-F filename] [-gc-all] [-gc-empty] [-hunkattr secname=value]
+  [-interp path] [-L library-search-path] [-l library-specifier]
   [-minalign val] [-mrel] [-multibase] [-nostdlib]
   [-o filename] [-rpath path] [-sc] [-sd] [-shared] [-soname name]
   [-static] [-T filename] [-Ttext addr] [-textbaserel]
@@ -407,6 +412,17 @@ Useful, if the number of objects exceeds the length of the command line.
 @item -fixunnamed
 All unnamed sections will get a default name according to
 their section type (@code{.text}, @code{.data} and @code{.bss}).
+
+@item -gc-all
+Section garbage collection.
+Starting from the executable's entry point, determine all referenced
+sections and delete the unreferenced ones.
+
+@item -gc-empty
+Delete all empty sections from an executable, which are not referenced
+from anywhere in the linked input files.
+Note: Before V1.5d vlink tried to do that always, but it didn't work in
+any case.
 
 @item -h
 Prints a short help text.
@@ -645,6 +661,12 @@ Discard all local symbols in the input files.
 
 @item -y symbol
 Trace the manipulations inflicted on symbol.
+
+@item -Z
+Do not delete trailing zero-bytes at the end of a section in executable
+output files. Usually the uninitialized part of a section is determined
+by the difference between the section's real size and file size (for
+those file formats which support it).
 @end table
 
 @section Known Problems
@@ -656,7 +678,7 @@ Trace the manipulations inflicted on symbol.
   @item Source level debugging support is missing for some formats.
   @item Many linker script commands are still missing.
   @item Default linker scripts are mostly missing, so you need to provide
-    your own script using the @option{-T} option.
+    your own script when using the @option{-T} option.
   @item @code{PHDR} support for ELF is not perfect.
 @end itemize
 
@@ -668,6 +690,7 @@ alphabetical order, probably not complete):
 @itemize
   @item Karoly Balogh
   @item Volker Barthelmann
+  @item Romain Giot
   @item Mikael Kalms
   @item Miro Kropacek
   @item Gunther Nikl
@@ -806,6 +829,8 @@ alphabetical order, probably not complete):
 @item %s: Unkown endianess defaults to %s-endian. Consider using -EB/-EL
 @item Resetting the same attribute for section %s
 @item Bad assignment after option '%s'
+@item Need a valid symbolic entry when using -gc-all
+@item Executable code section in first object required when using -gc-all
 @end enumerate
 
 @bye

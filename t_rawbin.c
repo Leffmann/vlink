@@ -1,11 +1,11 @@
-/* $VER: vlink t_rawbin.c V0.14b (28.07.13)
+/* $VER: vlink t_rawbin.c V0.15d (05.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2013  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2013 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -17,7 +17,8 @@
 #include "config.h"
 #if defined(RAWBIN1) || defined(RAWBIN2) || \
     defined(SREC19) || defined(SREC28) || defined(SREC37) || \
-    defined(IHEX) || defined(SHEX1) || defined(AMSDOS) || defined(CBMPRG)
+    defined(IHEX) || defined(SHEX1) || \
+    defined(AMSDOS) || defined(CBMPRG) || defined(JAGSRV)
 #define T_RAWBIN_C
 #include "vlink.h"
 
@@ -48,6 +49,12 @@ static void amsdos_write(struct GlobalVars *,FILE *);
 static unsigned long cbmprg_headersize(struct GlobalVars *);
 static void cbmprg_write(struct GlobalVars *,FILE *);
 #endif
+#ifdef JAGSRV
+#define TOSHDR_SIZE 28
+#define JAGR_SIZE 18
+static unsigned long jagsrv_headersize(struct GlobalVars *);
+static void jagsrv_write(struct GlobalVars *,FILE *);
+#endif
 #ifdef SREC19
 static void srec19_write(struct GlobalVars *,FILE *);
 #endif
@@ -64,6 +71,8 @@ static void ihex_write(struct GlobalVars *,FILE *);
 static void shex1_write(struct GlobalVars *,FILE *);
 #endif
 
+static lword execaddr;
+
 static const char defaultscript[] =
   "SECTIONS {\n"
   "  .text: { *(.text CODE text) *(seg*) *(.rodata*) }\n"
@@ -77,6 +86,7 @@ static const char defaultscript[] =
 struct FFFuncs fff_rawbin1 = {
   "rawbin1",
   defaultscript,
+  NULL,
   NULL,
   rawbin_headersize,
   rawbin_identify,
@@ -106,6 +116,7 @@ struct FFFuncs fff_rawbin1 = {
 struct FFFuncs fff_rawbin2 = {
   "rawbin2",
   defaultscript,
+  NULL,
   NULL,
   rawbin_headersize,
   rawbin_identify,
@@ -152,6 +163,7 @@ struct FFFuncs fff_amsdos = {
   "amsdos",
   amsdosscript,
   NULL,
+  NULL,
   amsdos_headersize,
   rawbin_identify,
   rawbin_readconv,
@@ -181,6 +193,7 @@ struct FFFuncs fff_cbmprg = {
   "cbmprg",
   defaultscript,
   NULL,
+  NULL,
   cbmprg_headersize,
   rawbin_identify,
   rawbin_readconv,
@@ -205,10 +218,60 @@ struct FFFuncs fff_cbmprg = {
 };
 #endif
 
+#ifdef JAGSRV
+static const char jaguarscript[] =
+  "SECTIONS {\n"
+  "  . = 0x4000;\n"
+  "  .text: {\n"
+  "    *(.text CODE text)\n"
+  "  }\n"
+  "  . = ALIGN(32);\n"
+  "  .data: {\n"
+  "    VBCC_CONSTRUCTORS\n"
+  "    *(.data DATA data)\n"
+  "  }\n"
+  "  . = ALIGN(32);\n"
+  "  .bss: {\n"
+  "    *(.bss BSS bss)\n"
+  "    *(COMMON)\n"
+  "    _BSS_END = ALIGN(32);\n"
+  "  }\n"
+  "}\n";
+
+struct FFFuncs fff_jagsrv = {
+  "jagsrv",
+  jaguarscript,
+  NULL,
+  NULL,
+  jagsrv_headersize,
+  rawbin_identify,
+  rawbin_readconv,
+  NULL,
+  rawbin_targetlink,
+  NULL,
+  NULL,
+  NULL,
+  NULL,NULL,NULL,
+  rawbin_writeobject,
+  rawbin_writeshared,
+  jagsrv_write,
+  NULL,NULL,
+  0,
+  0,
+  0,
+  0,
+  RTAB_UNDEF,0,
+  _BIG_ENDIAN_,
+  32,
+  0
+};
+#endif
+
 #ifdef SREC19
 struct FFFuncs fff_srec19 = {
   "srec19",
   defaultscript,
+  NULL,
   NULL,
   rawbin_headersize,
   rawbin_identify,
@@ -238,6 +301,7 @@ struct FFFuncs fff_srec28 = {
   "srec28",
   defaultscript,
   NULL,
+  NULL,
   rawbin_headersize,
   rawbin_identify,
   rawbin_readconv,
@@ -265,6 +329,7 @@ struct FFFuncs fff_srec28 = {
 struct FFFuncs fff_srec37 = {
   "srec37",
   defaultscript,
+  NULL,
   NULL,
   rawbin_headersize,
   rawbin_identify,
@@ -294,6 +359,7 @@ struct FFFuncs fff_ihex = {
   "ihex",
   defaultscript,
   NULL,
+  NULL,
   rawbin_headersize,
   rawbin_identify,
   rawbin_readconv,
@@ -321,6 +387,7 @@ struct FFFuncs fff_ihex = {
 struct FFFuncs fff_shex1 = {
   "oilhex",
   defaultscript,
+  NULL,
   NULL,
   rawbin_headersize,
   rawbin_identify,
@@ -369,6 +436,14 @@ static unsigned long amsdos_headersize(struct GlobalVars *gv)
 static unsigned long cbmprg_headersize(struct GlobalVars *gv)
 {
   return 2;
+}
+#endif
+
+
+#ifdef JAGSRV
+static unsigned long jagsrv_headersize(struct GlobalVars *gv)
+{
+  return TOSHDR_SIZE+JAGR_SIZE;  /* uses TOS-executable header */
 }
 #endif
 
@@ -425,8 +500,7 @@ static struct LinkedSection *get_next_section(struct GlobalVars *gv)
 
 
 #ifdef AMSDOS
-static void amsdos_header(FILE *f,uint16_t loadaddr,uint16_t execaddr,
-                          unsigned size)
+static void amsdos_header(FILE *f,uint16_t loadaddr,unsigned size)
 {
   uint8_t buffer[128];
   uint16_t checksum;
@@ -449,17 +523,43 @@ static void amsdos_header(FILE *f,uint16_t loadaddr,uint16_t execaddr,
 #endif
 
 
+#ifdef JAGSRV
+static void jagsrv_header(FILE *f,uint32_t loadaddr,unsigned size)
+{
+  uint8_t header[TOSHDR_SIZE+JAGR_SIZE];
+
+  memset(header,0,TOSHDR_SIZE+JAGR_SIZE);
+  write16be(&header[0],0x601a);
+  write32be(&header[2],size+JAGR_SIZE);
+
+  memcpy(&header[TOSHDR_SIZE+0],"JAGR",4);
+  write16be(&header[TOSHDR_SIZE+4],3);  /* command 3: Load & Run */
+  write32be(&header[TOSHDR_SIZE+6],loadaddr);
+  write32be(&header[TOSHDR_SIZE+10],size);
+  write32be(&header[TOSHDR_SIZE+14],execaddr);
+  fwritex(f,header,TOSHDR_SIZE+JAGR_SIZE);
+}
+#endif
+
+
 static void rawbin_writeheader(struct GlobalVars *gv,FILE *f,
                                struct LinkedSection *ls,char header)
 {
   /* write a header, when needed */
 #ifdef AMSDOS
   if (header == 'a')  /* Amstrad/Schneider CPC */
-    amsdos_header(f,ls->copybase,entry_address(gv),ls->filesize);
+    amsdos_header(f,ls->copybase,ls->filesize);
 #endif
 #ifdef CBMPRG
   if (header == 'c')  /* Commodore PET, VIC-20, 64, etc. */
     fwrite16le(f,ls->copybase);
+#endif
+#ifdef JAGSRV
+  if (header == 'j') {  /* Atari Jaguar, JAGSRV header for SkunkBoard */
+    struct LinkedSection *finls = (struct LinkedSection *)gv->lnksec.last;
+    jagsrv_header(f,ls->copybase,
+                  (finls->copybase+finls->filesize)-ls->copybase);
+  }
 #endif
 }
 
@@ -474,6 +574,10 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
   struct LinkedSection *ls,*prevls;
   char *name;
 
+  /* determine program's execution address */
+  execaddr = entry_address(gv);
+
+  /* section loop */
   while (ls = get_next_section(gv)) {
     if (ls->size==0 || !(ls->flags & SF_ALLOC) || (ls->ld_flags & LSF_NOLOAD))
       continue;  /* ignore empty sections */
@@ -594,6 +698,17 @@ static void cbmprg_write(struct GlobalVars *gv,FILE *f)
 /* for loading as an executable on PET, VIC-20, 64, etc. computers */
 {
   rawbin_writeexec(gv,f,FALSE,'c');
+}
+#endif
+
+
+#ifdef JAGSRV
+static void jagsrv_write(struct GlobalVars *gv,FILE *f)
+/* creates one or more raw-binary files with a JAGSRV header, suitable */
+/* for loading and executing on a SkunkBoard equipped Atari Jaguar, or */
+/* a VirtualJaguar emulator */
+{
+  rawbin_writeexec(gv,f,TRUE,'j');
 }
 #endif
 

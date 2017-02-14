@@ -1,11 +1,11 @@
-/* $VER: vlink targets.c V0.15c (16.10.16)
+/* $VER: vlink targets.c V0.15d (10.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -98,6 +98,9 @@ struct FFFuncs *fff[] = {
 #endif
 #ifdef CBMPRG
   &fff_cbmprg,
+#endif
+#ifdef JAGSRV
+  &fff_jagsrv,
 #endif
 #ifdef SREC19
   &fff_srec19,
@@ -1559,6 +1562,7 @@ struct Section *create_section(struct ObjectUnit *ou,const char *name,
     s->name = name;
   else
     s->name = noname;
+  s->hash = elf_hash(s->name);
   s->data = data;
   s->size = size;
   s->obj = ou;
@@ -1586,6 +1590,20 @@ struct Section *add_section(struct ObjectUnit *ou,const char *name,
   if (type != ST_TMP)  /* TMP sections must not be part of the link process */
     addtail(&ou->sections,&sec->n);
   return sec;
+}
+
+
+bool is_common_sec(struct GlobalVars *gv,struct Section *sec)
+{
+  return !SECNAMECMPH(sec,gv->common_sec_name,gv->common_sec_hash) ||
+         !SECNAMECMPH(sec,gv->scommon_sec_name,gv->scommon_sec_hash);
+}
+
+
+bool is_common_ls(struct GlobalVars *gv,struct LinkedSection *ls)
+{
+  return !SECNAMECMPH(ls,gv->common_sec_name,gv->common_sec_hash) ||
+         !SECNAMECMPH(ls,gv->scommon_sec_name,gv->scommon_sec_hash);
 }
 
 
@@ -1648,6 +1666,7 @@ struct Section *dummy_section(struct GlobalVars *gv,struct ObjectUnit *ou)
                     SF_ALLOC|SF_UNINITIALIZED,SP_READ|SP_WRITE,0,TRUE);
     s->lnksec = ls;
     ls->name = s->name;
+    ls->hash = s->hash;
     ls->type = s->type;
     ls->flags = s->flags;
     ls->protection = s->protection;
@@ -1673,6 +1692,7 @@ struct LinkedSection *create_lnksect(struct GlobalVars *gv,const char *name,
 
   ls->index = gv->nsecs++;
   ls->name = name;
+  ls->hash = elf_hash(name);
   ls->type = type;
   ls->flags = flags;
   ls->protection = protection;
@@ -1992,6 +2012,30 @@ lword entry_address(struct GlobalVars *gv)
 }
 
 
+struct Section *entry_section(struct GlobalVars *gv)
+{
+  struct Section *sec;
+  struct Symbol *sym;
+
+  /* get section of entry-symbol or _start */
+  if (gv->entry_name) {
+    if ((sym = findsymbol(gv,NULL,gv->entry_name)) == NULL)
+      error(131);  /* need a valid symbolic entry */
+  }
+  else
+    sym = findsymbol(gv,NULL,"_start");
+
+  if (sym != NULL)
+    sec = sym->relsect;
+  else  /* no entry: use the first code section from the first object */
+    sec = find_sect_type((struct ObjectUnit *)gv->selobjects.first,
+                         ST_CODE,SP_READ|SP_EXEC);
+  if (sec == NULL)
+    error(132);  /* executable code section in 1st object required */
+  return sec;
+}
+
+
 struct Symbol *bss_entry(struct ObjectUnit *ou,const char *secname,
                          struct Symbol *xdef)
 /* Create a BSS section in the object ou with space for xdef's size. 
@@ -2013,4 +2057,45 @@ struct Symbol *bss_entry(struct ObjectUnit *ou,const char *secname,
   }
 
   return NULL;
+}
+
+
+void trim_sections(struct GlobalVars *gv)
+{
+  struct LinkedSection *ls;
+  struct Section *sec,*nextsec;
+
+  /* Remove zero-bytes at the end of a section from filesize in executables */
+  if (!gv->dest_object && !gv->keep_trailing_zeros) {
+    for (ls=(struct LinkedSection *)gv->lnksec.first;
+         ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next) {
+      for (sec=(struct Section *)ls->sections.first;
+           sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+        nextsec = (struct Section *)sec->n.next;
+        if (!(sec->flags & SF_UNINITIALIZED) &&
+            (nextsec->n.next==NULL || (nextsec->flags & SF_UNINITIALIZED))) {
+          /* This is the last initialized sub-section, so check for
+             trailing zero-bytes, which can be subtracted from filesize. */
+          unsigned long secinit = sec->size;
+          uint8_t *p = sec->data + secinit;
+
+          while (secinit>sec->last_reloc && *(--p)==0)
+            --secinit;
+          ls->filesize = sec->offset + secinit;
+          break;
+        }
+      }
+    }
+  }
+}
+
+
+void untrim_sections(struct GlobalVars *gv)
+{
+  struct LinkedSection *ls;
+
+  /* set filesize=size in all sections */
+  for (ls=(struct LinkedSection *)gv->lnksec.first;
+       ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next)
+    ls->filesize = ls->size;
 }

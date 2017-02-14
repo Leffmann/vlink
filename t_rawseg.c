@@ -54,6 +54,7 @@ struct FFFuncs fff_rawseg = {
   "rawseg",
   defaultscript,
   NULL,
+  NULL,
   rawseg_headersize,
   rawseg_identify,
   rawseg_readconv,

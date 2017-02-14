@@ -384,8 +384,10 @@ static void elf32_stabs(struct GlobalVars *gv,struct LinkFile *lf,
                 funsec = relsec;
                 funstart = val;
               }
+#if 0 /* @@@ N_FUN without a label in n_value seems legal? */
               else
                 ierror("%s: N_FUN without relocatable address",fn);
+#endif
             }
             else {  /* no name marks function end, still relative */
               relsec = funsec;

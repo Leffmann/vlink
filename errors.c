@@ -1,11 +1,11 @@
-/* $VER: vlink errors.c V0.15a (09.12.15)
+/* $VER: vlink errors.c V0.15d (02.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -193,6 +193,9 @@ static struct {
     "Consider using -EB/-EL",EF_WARNING,
   "Resetting the same attribute for section %s",EF_WARNING,
   "Bad assignment after option '%s'",EF_FATAL,                     /* 130 */
+  "Need a valid symbolic entry when using -gc-all",EF_FATAL,
+  "Executable code section in first object required when using -gc-all",
+    EF_FATAL,
 };
 
 

@@ -1,11 +1,11 @@
-/* $VER: vlink vlink.h V0.15b (08.07.16)
+/* $VER: vlink vlink.h V0.15d (10.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -79,6 +79,13 @@ typedef int bool;
 #define FNAMEBUFSIZE 1024       /* buffer size for file names */
 #define MAX_FWALIGN 8192        /* max. aligment, when writing target file */
 
+/* macros */
+#define SECNAMECMP(s1,s2)       ((s1)->hash==(s2)->hash ? \
+                                  strcmp((s1)->name,(s2)->name) : -1)
+#define SECNAMECMPS(s,n)        ((s)->hash==elf_hash(n) ? \
+                                  strcmp((s)->name,(n)) : -1)
+#define SECNAMECMPH(s,n,h)      ((s)->hash==(h) ? \
+                                  strcmp((s)->name,(n)) : -1)
 
 /* structures */
 
@@ -188,6 +195,7 @@ struct Section {
   struct ObjectUnit *obj;       /* link to ObjectUnit */
   struct LinkedSection *lnksec; /* ptr to joined sections */
   const char *name;             /* section's name, e.g. .text, .data, ... */
+  unsigned long hash;           /* section name's hash code */
   uint32_t id;                  /* unique section id - target dependant */
   uint8_t type;                 /* type: code, data, bss */
   uint8_t flags;
@@ -220,6 +228,7 @@ struct Section {
 #define SF_UNINITIALIZED   0x02 /* section has uninitialized contents */
 #define SF_SMALLDATA       0x04 /* section is referenced base-relative */
 #define SF_LINKONCE        0x08 /* link only a single section with this name */
+#define SF_REFERENCED      0x10 /* section was referenced */
 #define SF_PORTABLE_MASK   0x1f /* mask for target-independant flags */
 /* target specific section flags: amiga */
 #define SF_EHFPPC          0x20  /* target ehf: section contains PPC code */
@@ -392,6 +401,7 @@ struct LinkedSection {          /* linked sections of same type and name */
   struct node n;
   int index;                    /* section index 0..gv->nsecs */
   const char *name;             /* section's name, e.g. .text, .data, ... */
+  unsigned long hash;           /* section name's hash code */
   uint8_t type;                 /* type: code, data, bss */
   uint8_t flags;
   uint8_t protection;           /* readable, writable, executable, ... */
@@ -482,7 +492,9 @@ struct GlobalVars {
   bool output_sections;         /* output each section as a new file */
   uint8_t min_alignment;        /* minimal section alignment (default 0) */
   bool auto_merge;              /* merge sections with pc-rel. references */
-  uint8_t opt_reserved[3];
+  uint8_t gc_sects;             /* garbage-collect unreferenced sections */
+  bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
+  uint8_t opt_reserved[1];
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   struct SymNames **trace_syms; /* trace-symbol hash table */
@@ -528,7 +540,9 @@ struct GlobalVars {
   struct Symbol *ctor_symbol;   /* constructor list label: __CTOR_LIST__ */
   struct Symbol *dtor_symbol;   /* destructor list label: __DTOR_LIST__ */
   const char *common_sec_name;  /* section name for common symbols */
+  unsigned long common_sec_hash;
   const char *scommon_sec_name; /* section name for small data com.symbols */
+  unsigned long scommon_sec_hash;
   const char *got_base_name;    /* GOT label: _GLOBAL_OFFSET_TABLE_ */
   const char *plt_base_name;    /* PLT label: _PROCEDURE_LINKAGE_TABLE_ */
   bool dynamic;                 /* dynamic linking - requires interpreter */
@@ -544,6 +558,11 @@ struct GlobalVars {
 /* endianess */
 #define _LITTLE_ENDIAN_ (0)
 #define _BIG_ENDIAN_ (1)
+
+/* gc_sects */
+#define GCS_NONE        0       /* no section garbage-collection */
+#define GCS_EMPTY       1       /* delete empty unreferenced sections */
+#define GCS_ALL         2       /* delete all unreferenced sections */
 
 /* reloctab_format */
 #define RTAB_UNDEF      0x00    /* format not preset by user */
@@ -576,6 +595,8 @@ struct FFFuncs {                /* file format specific functions and data */
   const char *tname;            /* name of file format */
   const char *exeldscript;      /* default linker-script for executables */
   const char *soldscript;       /* default linker-script for shared objects */
+  void                          /* optional init function for the target */
+    (*init)(struct GlobalVars *);
   unsigned long                 /* size of header before first section */
     (*headersize)(struct GlobalVars *);
   int                           /* format identification */
@@ -767,7 +788,10 @@ extern void linker_load(struct GlobalVars *);
 extern void linker_resolve(struct GlobalVars *);
 extern void linker_relrefs(struct GlobalVars *);
 extern void linker_dynprep(struct GlobalVars *);
+extern void linker_sectrefs(struct GlobalVars *);
+extern void linker_gcsects(struct GlobalVars *);
 extern void linker_join(struct GlobalVars *);
+extern void linker_delunused(struct GlobalVars *);
 extern void linker_mapfile(struct GlobalVars *);
 extern void linker_copy(struct GlobalVars *);
 extern void linker_relocate(struct GlobalVars *);
@@ -848,6 +872,8 @@ extern struct Section *create_section(struct ObjectUnit *,const char *,
 extern struct Section *add_section(struct ObjectUnit *,const char *,
                                    uint8_t *,unsigned long,uint8_t,uint8_t,
                                    uint8_t,uint8_t,bool);
+extern bool is_common_sec(struct GlobalVars *,struct Section *);
+extern bool is_common_ls(struct GlobalVars *,struct LinkedSection *);
 extern struct Section *common_section(struct GlobalVars *,struct ObjectUnit *);
 extern struct Section *scommon_section(struct GlobalVars *,struct ObjectUnit *);
 extern struct Section *abs_section(struct ObjectUnit *);
@@ -874,11 +900,14 @@ extern void get_text_data_bss(struct GlobalVars *,struct LinkedSection **);
 extern void text_data_bss_gaps(struct LinkedSection **);
 extern bool discard_symbol(struct GlobalVars *,struct Symbol *);
 extern lword entry_address(struct GlobalVars *gv);
+extern struct Section *entry_section(struct GlobalVars *);
 extern struct Symbol *bss_entry(struct ObjectUnit *,const char *,
                                 struct Symbol *);
 extern struct SecAttrOvr *addsecattrovr(struct GlobalVars *,char *,uint32_t);
 extern struct SecAttrOvr *getsecattrovr(struct GlobalVars *,const char *,
                                         uint32_t);
+extern void trim_sections(struct GlobalVars *);
+extern void untrim_sections(struct GlobalVars *);
 #endif
 
 /* dir.c */
@@ -1046,6 +1075,9 @@ extern struct FFFuncs fff_amsdos;
 #endif
 #if defined(CBMPRG)
 extern struct FFFuncs fff_cbmprg;
+#endif
+#if defined(JAGSRV)
+extern struct FFFuncs fff_jagsrv;
 #endif
 #if defined(SREC19)
 extern struct FFFuncs fff_srec19;

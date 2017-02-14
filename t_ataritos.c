@@ -34,6 +34,7 @@ struct FFFuncs fff_ataritos = {
   "ataritos",
   defaultscript,
   NULL,
+  NULL,
   headersize,
   identify,
   readconv,

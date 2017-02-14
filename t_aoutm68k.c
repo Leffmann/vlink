@@ -107,6 +107,7 @@ struct FFFuncs fff_aoutbsd68k = {
   "aoutbsd68k",
   zmagic_exe2,
   NULL,
+  NULL,
   aout_headersize,
   aoutbsd68k_identify,
   aoutstd_readconv,
@@ -137,6 +138,7 @@ static int aoutbsd68k4k_identify(char *,uint8_t *,unsigned long,bool);
 struct FFFuncs fff_aoutbsd68k4k = {
   "aoutbsd68k4k",
   zmagic_exe1,
+  NULL,
   NULL,
   aout_headersize,
   aoutbsd68k4k_identify,
@@ -169,6 +171,7 @@ struct FFFuncs fff_aoutsun010 = {
   "aoutsun010",
   zmagic_exe2,
   NULL,
+  NULL,
   aout_headersize,
   aoutsun010_identify,
   aoutstd_readconv,
@@ -199,6 +202,7 @@ static int aoutsun020_identify(char *,uint8_t *,unsigned long,bool);
 struct FFFuncs fff_aoutsun020 = {
   "aoutsun020",
   zmagic_exe2,
+  NULL,
   NULL,
   aout_headersize,
   aoutsun020_identify,
@@ -260,6 +264,7 @@ static int aoutjaguar_identify(char *,uint8_t *,unsigned long,bool);
 struct FFFuncs fff_aoutjaguar = {
   "aoutjaguar",
   jaguar_exe,
+  NULL,
   NULL,
   aout_headersize,
   aoutjaguar_identify, /* NULL */

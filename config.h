@@ -1,11 +1,11 @@
-/* $VER: vlink config.h V0.15a (22.01.15)
+/* $VER: vlink config.h V0.15d (05.01.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -79,6 +79,7 @@
 #define RAWBIN2             /* multiple raw binary files */
 #define AMSDOS              /* Amstrad/Schneider CPC program */
 #define CBMPRG              /* Commodore PET, VIC-20, 64, etc. program */
+#define JAGSRV              /* Jaguar Server (SkunkBoard, VirtualJaguar) */
 #define SREC19              /* Motorola S-Record 16-bit addresses */
 #define SREC28              /* Motorola S-Record 24-bit addresses */
 #define SREC37              /* Motorola S-Record 32-bit addresses */

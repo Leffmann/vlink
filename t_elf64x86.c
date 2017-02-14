@@ -34,6 +34,7 @@ struct FFFuncs fff_elf64x86 = {
   "elf64x86",
   NULL,
   NULL,
+  NULL,
   elf64_headersize,
   x86_64_identify,
   x86_64_readconv,

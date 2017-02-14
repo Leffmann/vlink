@@ -63,6 +63,7 @@ struct FFFuncs fff_aoutmint = {
   "aoutmint",
   mint_script,
   NULL,
+  NULL,
   aout_headersize,
   aoutmint_identify,
   aoutstd_readconv,

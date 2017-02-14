@@ -14,6 +14,18 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.15d (06.02.17)
+o Section-trimming, introduced with V0.15b, did not work well with ELF
+  executables. Fixed that.
+o New options -gc-all and -gc-empty for section garbage-collection.
+o New option -Z to prevent the linker from automatically removing a
+  section's trailing zero-bytes.
+o New output format: jagsrv. Absolute raw binary output, similar to rawbin1,
+  but with a header to make it load and execute via the Atari Jaguar
+  SkunkBoard or the VirtualJaguar emulator.
+o (ados/ehf): Fixed a memory leak in relocation output and optimized it.
+o (elf) Allow N_FUN stabs without a relocatable label in n_value.
+
 - 0.15c (01.11.16)
 o Fixed problems with relocation addend sign-extension, introduced in
   the last version.

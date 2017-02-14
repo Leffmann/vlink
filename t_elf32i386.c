@@ -37,6 +37,7 @@ struct FFFuncs fff_elf32i386 = {
   "elf32i386",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   i386_identify,
   i386_readconv,
@@ -75,6 +76,7 @@ static void aros_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32aros = {
   "elf32aros",
+  NULL,
   NULL,
   NULL,
   elf32_headersize,

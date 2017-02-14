@@ -1,11 +1,11 @@
-/* $VER: vlink elf.c V0.15b (17.04.16)
+/* $VER: vlink elf.c V0.15d (19.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -1039,6 +1039,9 @@ uint32_t elf_segmentcheck(struct GlobalVars *gv,size_t ehdrsize)
   struct LinkedSection *ls,*bss_start,*seg_lastdat,*seg_lastsec,*prg_lastdat;
   unsigned long foffs;
   uint32_t segcnt;
+
+  /* @@@ ELF executables cannot deal with trimmed sections??? */
+  untrim_sections(gv);
 
   /* find PHDR segment */
   for (phdrs=NULL,p=gv->phdrlist; p; p=p->next) {

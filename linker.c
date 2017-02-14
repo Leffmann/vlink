@@ -1,11 +1,11 @@
-/* $VER: vlink linker.c V0.15b (10.07.16)
+/* $VER: vlink linker.c V0.15d (10.01.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -468,24 +468,22 @@ static struct LinkedSection *get_matching_lnksec(struct GlobalVars *gv,
 
         /* standard check, if sections could be merged */
         if (myls == NULL) {
-          if (!strcmp(sec->name,lsn->name) || /* same name or no name */
-              *(sec->name)==0) {
-            if (lsn->type == sec->type) {   /* same type */
-              Dprintf("name: %s(%s) -> %s\n",getobjname(sec->obj),
-                      sec->name,lsn->name);
-              merge_sec_attrs(lsn,sec,f);
-              return (lsn);
-            }
-            else if (*(sec->name)==0 && sec->size==0) {
-              /* no name and no contents - may contain abs symbols only */
-              return (lsn);
-            }
+          /* check for same type and same name or no name */
+          if (lsn->type==sec->type &&
+              (*(sec->name)=='\0' || !SECNAMECMP(sec,lsn))) {
+            Dprintf("name: %s(%s) -> %s\n",getobjname(sec->obj),
+                    sec->name,lsn->name);
+            merge_sec_attrs(lsn,sec,f);
+            return (lsn);
+          }
+          else if (*(sec->name)=='\0' && sec->size==0) {
+            /* no name and no contents - may contain abs symbols only */
+            return (lsn);
           }
 
           if (!gv->dest_object) {
             /* COMMON sections are merged with any BSS-type section */
-            if (!strcmp(sec->name,gv->common_sec_name) ||
-                !strcmp(sec->name,gv->scommon_sec_name)) {
+            if (is_common_sec(gv,sec)) {
               if (lsn->type==ST_UDATA && (lsn->flags & SF_UNINITIALIZED)) {
                 Dprintf("common: %s(%s) -> %s\n",getobjname(sec->obj),
                         sec->name,lsn->name);
@@ -767,6 +765,88 @@ static void set_last_sec_reloc(struct Section *s,struct Reloc *r)
 }
 
 
+static void ref_all_sections(struct GlobalVars *gv)
+/* find referenced sections for -gc-empty */
+{
+  struct ObjectUnit *obj;
+  struct Section *sec;
+  struct Reloc *r;
+
+  for (obj=(struct ObjectUnit *)gv->selobjects.first;
+       obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+    for (sec=(struct Section *)obj->sections.first;
+         sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+      /* flag all referenced sections */
+      for (r=(struct Reloc *)sec->xrefs.first;
+           r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
+        if (r->relocsect.symbol->relsect != NULL)
+          r->relocsect.symbol->relsect->flags |= SF_REFERENCED;
+      }
+      for (r=(struct Reloc *)sec->relocs.first;
+           r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
+        if (r->relocsect.ptr != NULL)
+          r->relocsect.ptr->flags |= SF_REFERENCED;
+      }
+    }
+  }
+}
+
+
+static void ref_section(struct Section *sec)
+/* find referenced sections for -gc-all */
+{
+  struct Reloc *r;
+
+  if (sec == NULL)
+    return;
+
+  /* nothing to do, when section was already marked as referenced */
+  if ((sec->flags & SF_REFERENCED) != 0)
+    return;
+
+  /* mark section as referenced */
+  sec->flags |= SF_REFERENCED;
+  Dprintf("  %s(%s) referenced\n",getobjname(sec->obj),sec->name);
+
+  /* Find all referenced sections from here, by looking at all relocations
+     and symbol references. */
+
+  for (r=(struct Reloc *)sec->xrefs.first;
+       r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
+    ref_section(r->relocsect.symbol->relsect);
+  }
+
+  for (r=(struct Reloc *)sec->relocs.first;
+       r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
+    ref_section(r->relocsect.ptr);
+  }
+}
+
+
+static void ref_prot_symbols(struct GlobalVars *gv)
+/* mark all sections with global and local protected symbols as referenced */
+{
+  struct SymNames *sn = gv->prot_syms;
+  struct ObjectUnit *obj;
+  struct Symbol *psym;
+
+  /* find global protected symbols */
+  for (sn=gv->prot_syms; sn!=NULL; sn=sn->next) {
+    if (psym = findsymbol(gv,NULL,sn->name))
+      ref_section(psym->relsect);
+  }
+
+  /* find local protected symbols in all object units */
+  for (obj=(struct ObjectUnit *)gv->selobjects.first;
+       obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+    for (sn=gv->prot_syms; sn!=NULL; sn=sn->next) {
+      if (psym = findlocsymbol(gv,obj,sn->name))
+        ref_section(psym->relsect);
+    }
+  }
+}
+
+
 void linker_init(struct GlobalVars *gv)
 {
   initlist(&gv->linkfiles);
@@ -815,6 +895,8 @@ void linker_load(struct GlobalVars *gv)
     gv->scommon_sec_name = fff[gv->dest_format]->sbssname ?
                            fff[gv->dest_format]->sbssname : ".scommon";
   }
+  gv->common_sec_hash = elf_hash(gv->common_sec_name);
+  gv->scommon_sec_hash = elf_hash(gv->scommon_sec_name);
 
   if (gv->trace_file)
     fprintf(gv->trace_file,"\nLoading files:\n\n");
@@ -1245,6 +1327,59 @@ void linker_dynprep(struct GlobalVars *gv)
 }
 
 
+void linker_sectrefs(struct GlobalVars *gv)
+/* When creating a final executable:
+   recursively find all referenced sections starting from the entry-section */
+{
+  if (gv->gc_sects != GCS_NONE) {
+    if (!gv->dest_object && !gv->dest_sharedobj) {
+      Dprintf("Finding referenced sections:\n");
+      if (gv->gc_sects == GCS_EMPTY)
+        ref_all_sections(gv);
+      else if (gv->gc_sects == GCS_ALL)
+        ref_section(entry_section(gv));
+      else
+        ierror("");
+
+      /* mark sections with protected symbols as referenced */
+      ref_prot_symbols(gv);
+    }
+    else
+      gv->gc_sects = GCS_NONE;
+  }
+}
+
+
+void linker_gcsects(struct GlobalVars *gv)
+{
+  unsigned gcs;
+
+  if ((gcs = gv->gc_sects) != GCS_NONE) {
+    struct ObjectUnit *obj;
+    struct Section *sec,*nextsec;
+
+    Dprintf("Removing unreferenced sections:\n");
+    for (obj=(struct ObjectUnit *)gv->selobjects.first;
+         obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+      sec = (struct Section *)obj->sections.first;
+      while (nextsec = (struct Section *)sec->n.next) {
+        if (!(sec->flags & SF_REFERENCED)) {
+          if (gcs == GCS_ALL) {
+            remnode(&sec->n);  /* remove section from the linking process */
+            Dprintf("  %s(%s) removed (unreferenced)\n",getobjname(obj),sec->name);
+          }
+          else if (gcs==GCS_EMPTY && sec->size==0) {
+            remnode(&sec->n);  /* remove section from the linking process */
+            Dprintf("  %s(%s) removed (empty)\n",getobjname(obj),sec->name);
+          }
+        }
+        sec = nextsec;
+      }
+    }
+  }
+}
+
+
 void linker_join(struct GlobalVars *gv)
 /* Join the sections with same name and type, or as defined by a
    linker script. Calculate their virtual address and size. */
@@ -1351,8 +1486,7 @@ void linker_join(struct GlobalVars *gv)
                   update_address(ls->relocmem,ls->destmem,sec->size);
 
                   /* allocate COMMON symbols, if required */
-                  if ((!strcmp(sec->name,gv->common_sec_name) ||
-                       !strcmp(sec->name,gv->scommon_sec_name)) &&
+                  if (is_common_sec(gv,sec) &&
                       (!gv->dest_object || gv->alloc_common) &&
                       stype==ST_UDATA) {
                     update_address(ls->relocmem,ls->destmem,
@@ -1536,8 +1670,7 @@ void linker_join(struct GlobalVars *gv)
           ls->filesize += sec->size + abytes;
 
         /* allocate COMMON symbols, if required */
-        if ((!strcmp(sec->name,gv->common_sec_name) ||
-             !strcmp(sec->name,gv->scommon_sec_name)) &&
+        if (is_common_sec(gv,sec) &&
             (!gv->dest_object || gv->alloc_common)) {
           unsigned long n = allocate_common(gv,sec,ls->base+ls->size);
 
@@ -1549,27 +1682,45 @@ void linker_join(struct GlobalVars *gv)
     }
   }
 
-  /* Remove zero-bytes at the end of a section from filesize in executables */
-  if (!gv->dest_object) {
-    for (ls=(struct LinkedSection *)gv->lnksec.first;
-         ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next) {
-      for (sec=(struct Section *)ls->sections.first;
-           sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
-        nextsec = (struct Section *)sec->n.next;
-        if (!(sec->flags & SF_UNINITIALIZED) &&
-            (nextsec->n.next==NULL || (nextsec->flags & SF_UNINITIALIZED))) {
-          /* This is the last initialized sub-section, so check for
-             trailing zero-bytes, which can be subtracted from filesize. */
-          unsigned long secinit = sec->size;
-          uint8_t *p = sec->data + secinit;
+  trim_sections(gv);  /* remove zero-bytes at end of sections */
+}
 
-          while (secinit>sec->last_reloc && *(--p)==0)
-            --secinit;
-          ls->filesize = sec->offset + secinit;
-          break;
-        }
+
+void linker_delunused(struct GlobalVars *gv)
+/* remove empty, unused sections without relocations and symbols */
+{
+  struct LinkedSection *ls = (struct LinkedSection *)gv->lnksec.first;
+  struct LinkedSection *firstls=NULL,*nextls;
+
+  gv->nsecs = 0;
+
+  while (nextls = (struct LinkedSection *)ls->n.next) {
+    if (firstls == NULL)
+      firstls = ls;
+
+    if (ls->size==0 && listempty(&ls->relocs) &&
+        listempty(&ls->symbols) && !(ls->ld_flags & LSF_PRESERVE)) {
+      remnode(&ls->n);
+      if (ls == firstls)
+        firstls = NULL;
+
+      if (ls!=firstls && is_common_ls(gv,ls)) {
+        /* @@@ Attention! This is a big HACK!
+           For the future it should be desirable to have a separate
+           list for common symbols, instead of just putting them into
+           the symbol list of the first section... @@@ */
+        struct Symbol *sym;
+
+        if (firstls == NULL)
+          ierror("No other section before COMMON section?");
+        while (sym = (struct Symbol *)remhead(&ls->symbols))
+          addtail(&firstls->symbols,&sym->n);
       }
     }
+    else
+      ls->index = gv->nsecs++;  /* reindex remaining sections */
+
+    ls = nextls;
   }
 }
 
@@ -1602,8 +1753,7 @@ void linker_mapfile(struct GlobalVars *gv)
             for (sec=(struct Section *)ls->sections.first;
                  sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
               if (sec->obj == obj) {  /* section came from this object? */
-                if (strcmp(sec->name,gv->common_sec_name) &&
-                    strcmp(sec->name,gv->scommon_sec_name)) {
+                if (!is_common_sec(gv,sec)) {
                   fprintf(gv->map_file,"%c %s %lx(%lx)",sep,sec->name,
                           sec->va,sec->size);
                   sep = ',';
@@ -2197,6 +2347,7 @@ void linker_write(struct GlobalVars *gv)
   struct LinkedSection *firstls=NULL,*nextls;
   FILE *f;
 
+#if OBSOLETE /* replaced by gc_sects and linker_delunused() */
   /* remove empty sections without referenced symbols and relocs */
   gv->nsecs = 0;
   while (nextls = (struct LinkedSection *)ls->n.next) {
@@ -2221,8 +2372,7 @@ void linker_write(struct GlobalVars *gv)
         ls = nextls;
         continue;
       }
-      else if (ls!=firstls && (!strcmp(ls->name,gv->common_sec_name) ||
-                               !strcmp(ls->name,gv->scommon_sec_name))) {
+      else if (ls!=firstls && is_common_ls(gv,ls)) {
         /* @@@ Attention! This is a big HACK!
            For the future it should be desirable to have a separate
            list for common symbols, instead of just putting them into
@@ -2241,6 +2391,7 @@ void linker_write(struct GlobalVars *gv)
     ls->index = gv->nsecs++;  /* reindex remaining sections */
     ls = nextls;
   }
+#endif /* OBSOLETE */
 
   if (!gv->errflag) {  /* no error? */
     if (gv->trace_file) {

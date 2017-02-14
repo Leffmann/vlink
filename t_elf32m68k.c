@@ -34,6 +34,7 @@ struct FFFuncs fff_elf32m68k = {
   "elf32m68k",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   m68k_identify,
   m68k_readconv,

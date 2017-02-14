@@ -1,11 +1,11 @@
-/* $VER: vlink t_amigahunk.c V0.15a (04.02.16)
+/* $VER: vlink t_amigahunk.c V0.15d (07.01.16)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  *
  * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
+ * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
  * vlink may be freely redistributed as long as no modifications are
  * made and nothing is charged for it. Non-commercial usage is allowed
  * without any restrictions.
@@ -21,6 +21,7 @@
 #include "amigahunks.h"
 
 
+static void init(struct GlobalVars *);
 static int ados_identify(char*,uint8_t *,unsigned long,bool);
 static int ehf_identify(char *,uint8_t *,unsigned long,bool);
 static int identify(char *,uint8_t *,unsigned long,bool);
@@ -46,6 +47,7 @@ struct FFFuncs fff_amigahunk = {
   "amigahunk",
   NULL,
   NULL,
+  init,
   headersize,
   ados_identify,
   readconv,
@@ -73,6 +75,7 @@ struct FFFuncs fff_ehf = {
   "amigaehf",
   NULL,
   NULL,
+  init,
   headersize,
   ehf_identify,
   readconv,
@@ -129,8 +132,22 @@ static char *ados_symnames[] = {
 #define ELFS2 17
 #define LAST_LNKSYM ELFS2
 
-static bool exthunk,symhunk;
+/* special section names */
+static const char merged_name[] = "__MERGED";
+static const char nomerge_name[] = "_NOMERGE";
+static unsigned long merged_hash,nomerge_hash;
 
+static bool exthunk,symhunk;
+static struct list *rlist;
+static int *rcnt;
+
+
+
+static void init(struct GlobalVars *gv)
+{
+  merged_hash = elf_hash(merged_name);
+  nomerge_hash = elf_hash(nomerge_name);
+}
 
 
 /*****************************************************************/
@@ -1076,8 +1093,6 @@ static int targetlink(struct GlobalVars *gv,struct LinkedSection *ls,
 /* returns -1, if target doesn't want to combine them, */
 /* returns 0, if target doesn't care - standard linking rules are used. */
 {
-  static char *merged = "__MERGED";
-
   /* AmigaDOS doesn't merge unnamed sections, unless the Small- */
   /* Data/Code option was set */
   if (!(gv->small_code && s->type==ST_CODE) &&
@@ -1086,10 +1101,11 @@ static int targetlink(struct GlobalVars *gv,struct LinkedSection *ls,
       return -1;
 
   /* sections with name "_NOMERGE" are never combined */
-  if (!strcmp(s->name,"_NOMERGE"))
+  if (!SECNAMECMPH(s,nomerge_name,nomerge_hash))
     return -1;
 
-  if (!strcmp(ls->name,merged) && !strcmp(s->name,merged)) {
+  if (!SECNAMECMPH(ls,merged_name,merged_hash) &&
+      !SECNAMECMPH(s,merged_name,merged_hash)) {
     /* data and bss section with name __MERGED are always combined */
     if (s->type == ST_CODE)
       error(57,getobjname(s->obj)); /* Merging code section "__MERGED" */
@@ -1599,23 +1615,38 @@ static void fix_xref_addends(struct GlobalVars *gv,struct LinkedSection *ls)
 }
 
 
+static void alloc_reloc_lists(struct GlobalVars *gv)
+{
+  /* allocate lists and counters to hold reloction entries for all sections */
+  rlist = alloc(gv->nsecs*sizeof(struct list));
+  rcnt = alloc(gv->nsecs*sizeof(int));
+}
+
+
+static void init_reloc_lists(struct GlobalVars *gv)
+{
+  int i;
+
+  /* empty all lists and reset counters to zero */
+  for (i=0; i<gv->nsecs; i++) {
+    initlist(&rlist[i]);
+    rcnt[i] = 0;
+  }
+}
+
+
 static void reloc_hunk(struct GlobalVars *gv,FILE *f,
                        struct LinkedSection *sec,uint32_t relhunk,
                        uint8_t rtype,uint16_t rsize)
 /* generate an AmigaDOS/EHF relocation hunk for a specific reloc type */
 {
   struct Reloc *nextrel,*rel=(struct Reloc *)sec->relocs.first;
-  struct list **rlist=alloc(gv->nsecs*sizeof(struct list *));
-  int *rcnt=alloczero(gv->nsecs*sizeof(int)); /* reloc cnt for all sect. */
   bool hunk_required=FALSE,small_offsets=TRUE;
   lword chkmask,rmask=makemask(rsize);
   uint16_t rpos=0;
   int i;
 
-  for (i=0; i<gv->nsecs; i++) {  /* empty reloc lists for each section */
-    rlist[i] = alloc(sizeof(struct list));
-    initlist(rlist[i]);
-  }
+  init_reloc_lists(gv);
 
   /* EHF-PowerPC relocations need special treatment */
   if (rsize == 24) {
@@ -1639,7 +1670,7 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
       if (ri->bpos==rpos && ri->bsiz==rsize && (ri->mask&rmask)==chkmask) {
         /* move reloc node of correct type into relocssect's rlist */
         remnode(&rel->n);
-        addtail(rlist[rel->relocsect.lnk->index],&rel->n);
+        addtail(&rlist[rel->relocsect.lnk->index],&rel->n);
         rel->offset += rpos >> 3;
         if (++rcnt[rel->relocsect.lnk->index] >= 0x10000 ||
             rel->offset >= 0x10000)
@@ -1665,15 +1696,16 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
       if (!small_offsets) {
         /* cannot represent those relocs, so put them back */
         for (i=0; i<gv->nsecs; i++) {
-          while (rel = (struct Reloc *)remhead(rlist[i]))
+          while (rel = (struct Reloc *)remhead(&rlist[i]))
             addtail(&sec->relocs,&rel->n);
         }
-        goto free_rlists;
+        return;
       }
+
       if (!gv->dest_object && relhunk==HUNK_ABSRELOC32)
         relhunk = HUNK_DREL32;
-      fwrite32be(f,relhunk);  /* reloc hunk id */
 
+      fwrite32be(f,relhunk);  /* reloc hunk id */
       for (i=0; i<gv->nsecs; i++) {
         if (rcnt[i]) {
           fwrite16be(f,(uint16_t)rcnt[i]);  /* number of relocations */
@@ -1681,7 +1713,7 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
           cnt += 2;
 
           /* store relocation offsets */
-          while (rel = (struct Reloc *)remhead(rlist[i])) {
+          while (rel = (struct Reloc *)remhead(&rlist[i])) {
             fwrite16be(f,(uint16_t)rel->offset);
             cnt++;
           }
@@ -1709,7 +1741,7 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
 
           /* store relocation offsets */
           while (n--) {
-            if (rel = (struct Reloc *)remhead(rlist[i])) {
+            if (rel = (struct Reloc *)remhead(&rlist[i])) {
               fwrite32be(f,(uint32_t)rel->offset);
             }
           }
@@ -1718,11 +1750,6 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
       fwrite32be(f,0);  /* no more relocation entries */
     }
   }
-
-  free_rlists:
-  /* free dynamically allocated rlists and rcnt array */
-  for (i=0; i<gv->nsecs; free(rlist[i++]));
-  free(rcnt);
 }
 
 
@@ -1738,6 +1765,7 @@ static void writeobject(struct GlobalVars *gv,FILE *f,bool ehf)
   struct LinkedSection *ls = (struct LinkedSection *)gv->lnksec.first;
   struct LinkedSection *nextls;
 
+  alloc_reloc_lists(gv);
   fwrite32be(f,HUNK_UNIT);
   hunk_name_len(f,gv->dest_name);  /* unit name is output file name */
 
@@ -1838,6 +1866,7 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
   struct LinkedSection *nextls;
   int i=0;
 
+  alloc_reloc_lists(gv);
   fwrite32be(f,HUNK_HEADER);
   fwrite32be(f,0);  /* resident libraries no longer supp. since OS2.0 */
 

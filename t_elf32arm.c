@@ -33,6 +33,7 @@ struct FFFuncs fff_elf32armle = {
   "elf32armle",
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   armle_identify,
   armle_readconv,
