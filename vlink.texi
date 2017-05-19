@@ -42,15 +42,16 @@ Empty sections and other unused data are deleted to achieve a size-optimized
 output.
 
 @section Legal
-@command{vlink} is freeware and part of the portable and retargetable ANSI C
-compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
+    vlink is copyright 1995-2017 by Frank Wille.
 
-@command{vlink} may be freely redistributed as long as no modifications are
-made and nothing is charged for it. Non-commercial usage is allowed
-without any restrictions.
+    This archive may be redistributed without modifications and used
+    for non-commercial purposes.
 
-Every product or program derived directly from my source may not be
-sold commercially without permission from the author.
+    An exception for commercial usage is granted, provided that the
+    target OS is AmigaOS/68k. Resulting binaries may be distributed
+    commercially without further licensing.
+
+    In all other cases you need my written consent.
 
 
 @section Installation
@@ -118,6 +119,9 @@ No shared objects. Small data offset @code{0x7ffe}. Linker symbols:
   @item __BSSLEN (SASC/StormC)
   @item ___ctors (SASC/StormC)
   @item ___dtors (SASC/StormC)
+  @item _RESLEN (SASC)
+  @item _RESBASE (SASC)
+  @item _NEWDATAL (SASC)
   @item __DATA_BAS (DICE-C)
   @item __DATA_LEN (DICE-C)
   @item __BSS_LEN (DICE-C)
@@ -130,6 +134,14 @@ No shared objects. Small data offset @code{0x7ffe}. Linker symbols:
 Automatic constructor/destructor function tables:
 @code{___ctors} and @code{___dtors} (will be mapped automatically to
 @code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
+
+Referencing @code{_RESLEN} switches the hunk-format output module
+into Resident mode, which will append a special relocation table to the
+initialized part of the data-bss section and warns about absolute
+references from other sections. This mode can be used to create
+reentrable, "pure" programs, for use with the AmigaOS @command{resident}
+command.
+
 Supports @option{-Rstd} and @option{-Rshort}. @option{-hunkattr} can be
 used to overwrite the memory flags of an input section.
 This format was called "amigaos" in former @command{vlink} versions.
@@ -831,6 +843,9 @@ alphabetical order, probably not complete):
 @item Bad assignment after option '%s'
 @item Need a valid symbolic entry when using -gc-all
 @item Executable code section in first object required when using -gc-all
+@item Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=0x%llx) in resident data section
+@item %s (%s+0x%x): Absolute reference to resident data section (%s)
+
 @end enumerate
 
 @bye

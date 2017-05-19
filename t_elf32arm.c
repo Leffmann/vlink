@@ -3,14 +3,6 @@
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2010  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2010 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -158,9 +150,9 @@ static void armle_readconv(struct GlobalVars *gv,struct LinkFile *lf)
     if (ar_init(&ai,(char *)lf->data,lf->length,lf->filename)) {
       while (ar_extract(&ai)) {
         lf->objname = allocstring(ai.name);
-        elf_check_ar_type(fff[lf->format],lf->pathname,ai.data,
-                          ELFCLASS32,ELFDATA2LSB,ELF_VER,1,EM_ARM);
-        elf32_parse(gv,lf,(struct Elf32_Ehdr *)ai.data,armle_reloc_elf2vlink);
+        if (elf_check_ar_type(fff[lf->format],lf->pathname,ai.data,
+                              ELFCLASS32,ELFDATA2LSB,ELF_VER,1,EM_ARM))
+          elf32_parse(gv,lf,(struct Elf32_Ehdr *)ai.data,armle_reloc_elf2vlink);
       }
     }
     else

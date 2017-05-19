@@ -3,14 +3,6 @@
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2017  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -2072,7 +2064,7 @@ void trim_sections(struct GlobalVars *gv)
       for (sec=(struct Section *)ls->sections.first;
            sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
         nextsec = (struct Section *)sec->n.next;
-        if (!(sec->flags & SF_UNINITIALIZED) &&
+        if (sec->data!=NULL && !(sec->flags & SF_UNINITIALIZED) &&
             (nextsec->n.next==NULL || (nextsec->flags & SF_UNINITIALIZED))) {
           /* This is the last initialized sub-section, so check for
              trailing zero-bytes, which can be subtracted from filesize. */

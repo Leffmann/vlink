@@ -1,16 +1,8 @@
-/* $VER: vlink errors.c V0.15d (02.01.17)
+/* $VER: vlink errors.c V0.15e (23.03.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2017  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -77,8 +69,8 @@ static struct {
     "%s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,
   "%s: Malformatted archive member %s",EF_FATAL,
   "%s: Empty archive ignored",EF_WARNING,
-  "%s: %s doesn't support shared objects in library archives",EF_FATAL,
-  "%s: %s doesn't support executables in library archives",EF_FATAL,/* 40 */
+  "%s: %s doesn't support shared objects in library archives",EF_WARNING,
+  "%s: %s doesn't support executables in library archives",EF_WARNING,/* 40 */
   "%s (%s): Illegal format / file corrupted",EF_FATAL,
   "%s: Consistency check for archive member %s failed",EF_FATAL,
   "%s: Invalid ELF section header index (%d) in %s",EF_FATAL,
@@ -196,6 +188,9 @@ static struct {
   "Need a valid symbolic entry when using -gc-all",EF_FATAL,
   "Executable code section in first object required when using -gc-all",
     EF_FATAL,
+  "Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=0x%llx) "
+    "in resident data section",EF_ERROR,
+  "%s (%s+0x%x): Absolute reference to resident data section (%s)",EF_WARNING,
 };
 
 

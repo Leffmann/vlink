@@ -14,6 +14,22 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.16 (16.05.17)
+o Fixed a potential crash when linking with empty object files, while
+  using a linker script.
+o (ados/ehf): Support blink/slink linker symbols _RESLEN, _RESBASE,
+  _NEWDATAL for generating resident (pure) programs.
+o (ados/ehf): Fixed SAS/C-compatibility linker symbol __BSSLEN. Now it
+  represents the number of long words instead of the number of bytes.
+  WARNING! Make sure to check your code, if you used __BSSLEN before!
+o (ados/ehf): AmigaOS LoadSeg() (up to V40) has a problem with allocating
+  data-bss sections, which have an initialized size of 0. Implemented a
+  workaround for this case.
+o (elf) Fixed crash in dynamic linking due to section-trimming.
+o (elf,aout) Malformatted library archive files are no longer fatal, but
+  will be ignored.
+o (rawseg) Do not write output sections marked with NOLOAD.
+
 - 0.15d (06.02.17)
 o Section-trimming, introduced with V0.15b, did not work well with ELF
   executables. Fixed that.

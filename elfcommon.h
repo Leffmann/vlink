@@ -1,16 +1,8 @@
-/* $VER: vlink elfcommon.h V0.15a (22.01.15)
+/* $VER: vlink elfcommon.h V0.15e (23.03.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2015 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
+ * Copyright (c) 1997-2017  Frank Wille
  */
 
 
@@ -359,7 +351,7 @@ extern const char *pltrel_name[2];
 /* functions for reading */
 int elf_identify(struct FFFuncs *,char *,void *,lword,unsigned char,
                  unsigned char,uint16_t,uint32_t);
-void elf_check_ar_type(struct FFFuncs *,const char *,void *,unsigned char,
+bool elf_check_ar_type(struct FFFuncs *,const char *,void *,unsigned char,
                        unsigned char,uint32_t,int,...);
 void elf_check_offset(struct LinkFile *,char *,void *,lword);
 struct Section *elf_add_section(struct GlobalVars *,struct ObjectUnit *,

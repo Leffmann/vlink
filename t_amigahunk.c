@@ -1,16 +1,8 @@
-/* $VER: vlink t_amigahunk.c V0.15d (07.01.16)
+/* $VER: vlink t_amigahunk.c V0.15e (12.04.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2017  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -105,41 +97,33 @@ static char ehf_addrsym[] = "@_";
 
 static char tocd_name[] = ".tocd";
 
+/* Linker symbols, which are generated when referenced. */
 static char *ados_symnames[] = {
   /* PhxAss */     "_DATA_BAS_","_DATA_LEN_","_BSS_LEN_",
   /* SAS/StormC */ "_LinkerDB","__BSSBAS","__BSSLEN","___ctors","___dtors",
+  /* SAS-C Res. */ "_RESLEN","_RESBASE","_NEWDATAL",
   /* DICE-C */     "__DATA_BAS","__DATA_LEN","__BSS_LEN","__RESIDENT",
   /* GNU-C */      "___machtype","___text_size","___data_size","___bss_size",
   /* ELF */        "_SDA_BASE_","_SDA2_BASE_"
 };
-#define PHXDB 0
-#define PHXDL 1
-#define PHXBL 2
-#define SASPT 3
-#define SASBB 4
-#define SASBL 5
-#define SASCT 6
-#define SASDT 7
-#define DICDB 8
-#define DICDL 9
-#define DICBL 10
-#define DICRS 11
-#define GNUMT 12
-#define GNUTL 13
-#define GNUDL 14
-#define GNUBL 15
-#define ELFSD 16
-#define ELFS2 17
-#define LAST_LNKSYM ELFS2
+enum {
+  PHXDB,PHXDL,PHXBL,
+  SASPT,SASBB,SASBL,SASCT,SASDT,
+  SASRL,SASRB,SASDL,
+  DICDB,DICDL,DICBL,DICRS,
+  GNUMT,GNUTL,GNUDL,GNUBL,
+  ELFSD,ELFS2,
+  NUM_LNKSYMS
+};
 
 /* special section names */
 static const char merged_name[] = "__MERGED";
 static const char nomerge_name[] = "_NOMERGE";
 static unsigned long merged_hash,nomerge_hash;
 
-static bool exthunk,symhunk;
-static struct list *rlist;
-static int *rcnt;
+static bool exthunk,symhunk,resmode;
+static struct list *rlist,rrlist;
+static int *rcnt,rrcnt;
 
 
 
@@ -1124,7 +1108,7 @@ static struct Symbol *ados_lnksym(struct GlobalVars *gv,struct Section *sec,
   int i;
 
   if (!gv->dest_object) {
-    for (i=0; i<=LAST_LNKSYM; i++) {
+    for (i=0; i<NUM_LNKSYMS; i++) {
       if (!strcmp(ados_symnames[i],xref->xrefname)) {
         if (i==SASCT || i==SASDT) {
           /* map to ___CTOR_LIST__ / ___DTOR_LIST__ */
@@ -1138,6 +1122,7 @@ static struct Symbol *ados_lnksym(struct GlobalVars *gv,struct Section *sec,
               i==ELFSD || i==ELFS2) {
             sym->type = SYM_RELOC;
           }
+
           if ((i==SASPT || i==PHXDB || i==DICDB) &&
               findlnksymbol(gv,sdabase_name)==NULL) {
             /* Reference to _LinkerDB, _DATA_BAS_ or __DATA_BAS
@@ -1148,6 +1133,9 @@ static struct Symbol *ados_lnksym(struct GlobalVars *gv,struct Section *sec,
             sdabase->type = SYM_RELOC;
             sdabase->extra = ELFSD;
           }
+          else if (i == SASRL)
+            resmode = TRUE;  /* enable Resident linking mode */
+
           sym->extra = i;  /* for easy identification in ados_setlnksym */
           return sym;  /* new linker symbol created */
         }
@@ -1158,9 +1146,113 @@ static struct Symbol *ados_lnksym(struct GlobalVars *gv,struct Section *sec,
 }
 
 
+static void get_resident_sdrelocs(struct GlobalVars *gv)
+/* In "Resident" linking mode all small-data 32-bit absolute internal
+   relocations will be copied to a separate list, which will later
+   be appended to the initialized part of the section. */
+{
+  struct LinkedSection *sdsec = smalldata_section(gv);
+  struct LinkedSection *ls;
+  struct Section *sec;
+
+  initlist(&rrlist);
+
+  for (ls=(struct LinkedSection *)gv->lnksec.first;
+       ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next) {
+
+    for (sec=(struct Section *)ls->sections.first;
+         sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+      struct Reloc *r = (struct Reloc *)sec->relocs.first;
+      struct Reloc *nextr;
+      struct RelocInsert *ri;
+
+      /* find abs relocs for small data section */
+      while (nextr = (struct Reloc *)r->n.next) {
+        if (ls == sdsec) {
+          if (r->rtype==R_ABS && r->relocsect.ptr->lnksec==sdsec) {
+            if ((ri=r->insert)!=NULL && ri->bsiz==32) {
+              /* Remove this absolute 32-bit reloc and put it into
+                 our own list of Resident relocs. */
+              remnode(&r->n);
+              r->offset += sec->offset;
+              r->addend += r->relocsect.ptr->offset;
+              addtail(&rrlist,&r->n);
+              ++rrcnt;
+            }
+            else {  /* unsupported abs reloc in resident SD section */
+              if (ri != NULL)
+                error(133,(lword)(r->offset+sec->offset),
+                      (int)ri->bpos,(int)ri->bsiz,(lword)ri->mask);
+              else
+                ierror("get_resident_sdrelocs(): missing rel reloc info");
+            }
+          }
+        }
+        else {
+          if (r->relocsect.ptr->lnksec==sdsec && r->rtype==R_ABS) {
+              char addbuf[20];
+
+              /* absolute reference to resident data section */
+              snprintf(addbuf,20,"0x%lx",
+                       (unsigned long)(r->addend+r->relocsect.ptr->offset));
+              error(134,getobjname(sec->obj),sec->name,r->offset,addbuf);
+          }
+        }
+        r = nextr;
+      }
+
+      /* find and resolve abs x-references for small data section */
+      r = (struct Reloc *)sec->xrefs.first;
+      while (nextr = (struct Reloc *)r->n.next) {
+        struct Symbol *xdef = r->relocsect.symbol;
+
+        if (xdef!=NULL && xdef->type==SYM_RELOC) {
+          if (ls == sdsec) {
+            if (r->rtype==R_ABS && xdef->relsect->lnksec==sdsec) {
+              if ((ri=r->insert)!=NULL && ri->bsiz==32) {
+                /* Remove this absolute 32-bit reference, resolve it,
+                   and put it into our own list of Resident relocs. */
+                remnode(&r->n);
+                r->offset += sec->offset;
+                r->addend += xdef->value - (lword)xdef->relsect->lnksec->base;
+                addtail(&rrlist,&r->n);
+                ++rrcnt;
+              }
+              else {  /* unsupported abs reloc in resident SD section */
+                if (ri != NULL)
+                  error(133,(lword)(r->offset+sec->offset),
+                        (int)ri->bpos,(int)ri->bsiz,(lword)ri->mask);
+                else
+                  ierror("get_resident_sdrelocs(): missing xref reloc info");
+              }
+            }
+          }
+          else {
+            if (xdef->relsect->lnksec==sdsec && r->rtype==R_ABS)
+              /* absolute reference to resident data section */
+              error(134,getobjname(sec->obj),sec->name,r->offset,xdef->name);
+          }
+        }
+        r = nextr;
+      }
+    }
+  }
+}
+
+
 static void ados_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
 /* Initialize ADOS linker symbol structure during resolve_xref() */
 {
+  if (resmode) {
+    /* Handle Resident mode once, before any other linker symbol. */
+    static bool resinit = FALSE;
+
+    if (!resinit) {
+      get_resident_sdrelocs(gv);
+      resinit = TRUE;
+    }
+  }
+
   if (xdef->flags & SYMF_LNKSYM) {
     struct LinkedSection *ls,*sdsec=NULL;
 
@@ -1178,14 +1270,24 @@ static void ados_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
       case PHXDL:
       case SASBB:
       case DICDL:
-        xdef->value = (lword)sdsec->filesize;
+        xdef->value = (lword)((sdsec->filesize + 3) & ~3);
         break;
       case PHXBL:
-      case SASBL:
       case DICBL:
-        xdef->value = (lword)(sdsec->size - sdsec->filesize);
+        xdef->value = (lword)(((sdsec->size+3)&~3)-((sdsec->filesize+3)&~3));
+        break;
+      case SASBL:
+        xdef->value = (lword)(((sdsec->size+3)&~3) - 
+                              ((sdsec->filesize+3)&~3)) >> 2;
+        break;
+      case SASDL:
+        xdef->value = (lword)((sdsec->filesize + 3) & ~3) >> 2;
+        break;
+      case SASRL:
+        xdef->value = (lword)((sdsec->size + 3) & ~3);
         break;
       case SASPT:
+      case SASRB:
       case ELFSD:
       case ELFS2:
         xdef->value = (lword)fff[gv->dest_format]->baseoff;
@@ -1615,6 +1717,17 @@ static void fix_xref_addends(struct GlobalVars *gv,struct LinkedSection *ls)
 }
 
 
+static void fix_resrel_addends(struct GlobalVars *gv,struct LinkedSection *ls)
+{
+  struct Reloc *rel;
+
+  for (rel=(struct Reloc *)rrlist.first;
+       rel->n.next!=NULL; rel=(struct Reloc *)rel->n.next) {
+    writesection(gv,ls->data+rel->offset,rel,rel->addend);
+  }
+}
+
+
 static void alloc_reloc_lists(struct GlobalVars *gv)
 {
   /* allocate lists and counters to hold reloction entries for all sections */
@@ -1863,10 +1976,18 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
 /* creates a target-amigahunk executable file (which is relocatable) */
 {
   struct LinkedSection *ls = (struct LinkedSection *)gv->lnksec.first;
-  struct LinkedSection *nextls;
+  struct LinkedSection *nextls,*resls;
   int i=0;
 
   alloc_reloc_lists(gv);
+
+  if (resmode) {
+    resls = smalldata_section(gv);
+    fix_resrel_addends(gv,resls);
+  }
+  else
+    resls = NULL;
+
   fwrite32be(f,HUNK_HEADER);
   fwrite32be(f,0);  /* resident libraries no longer supp. since OS2.0 */
 
@@ -1888,7 +2009,14 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
 
   /* write section size specifiers */
   while (nextls = (struct LinkedSection *)ls->n.next) {
-    hunk_memdata(f,ls->memattr,(ls->size+3)>>2);
+    uint32_t len;
+
+    /* resident mode smalldata section has special reloc table appended */
+    if (ls == resls)
+      len = ((ls->filesize + 3) >> 2) + rrcnt + 1;
+    else
+      len = (ls->size + 3) >> 2;
+    hunk_memdata(f,ls->memattr,len);
     ls = nextls;
     i++;
   }
@@ -1909,7 +2037,7 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
         fwrite32be(f,HUNK_DATA);
         break;
       case ST_UDATA:
-        fwrite32be(f,HUNK_BSS);
+        fwrite32be(f,ls==resls?HUNK_DATA:HUNK_BSS);
         break;
       default:
         ierror("writeexec(): Illegal section type %u",ls->type);
@@ -1917,7 +2045,30 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
     }
 
     fix_reloc_addends(gv,ls);
-    if (ls->flags & SF_UNINITIALIZED) {
+
+    /* Work around a bug in AmigaOS LoadSeg() (up to dos.library V40), which
+       gets confused with completely uninitialized data-bss sections. */
+    if (!(ls->flags&SF_UNINITIALIZED) && ls->filesize==0)
+      ls->filesize = ls->size>4 ? 4 : ls->size;
+
+    if (ls == resls) {
+      struct Reloc *rel;
+
+      fwrite32be(f,((ls->filesize+3)>>2)+rrcnt+1);
+      fwritex(f,ls->data,ls->filesize);   /* write section contents */
+      fwrite_align(f,2,ls->filesize);
+
+      /* Append a special reloc table for resident programs.
+         Format: ulong nentries [, ulong reloc-offset ...] */
+      fwrite32be(f,rrcnt);
+      for (i=0,rel=(struct Reloc *)rrlist.first;
+           rel->n.next!=NULL; rel=(struct Reloc *)rel->n.next,i++)
+        fwrite32be(f,rel->offset);
+
+      if (i != rrcnt)
+        ierror("writeexec(): Res.Relocs found: %d expected: %d\n",i,rrcnt);
+    }
+    else if (ls->flags & SF_UNINITIALIZED) {
       fwrite32be(f,(ls->size+3)>>2);  /* bss - size only */
     }
     else {

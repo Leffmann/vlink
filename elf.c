@@ -1,16 +1,8 @@
-/* $VER: vlink elf.c V0.15d (19.01.17)
+/* $VER: vlink elf.c V0.15e (23.03.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2017  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -120,12 +112,16 @@ int elf_identify(struct FFFuncs *ff,char *name,void *p,
         case ET_REL:
           return arflag ? ID_LIBARCH : ID_OBJECT;
         case ET_EXEC:
-          if (arflag) /* no executables in library archives */
+          if (arflag) { /* no executables in library archives */
             error(40,name,ff->tname);
+            return ID_UNKNOWN;
+          }
           return ID_EXECUTABLE;
         case ET_DYN:
-          if (arflag) /* no shared objects in library archives */
+          if (arflag) { /* no shared objects in library archives */
             error(39,name,ff->tname);
+            return ID_UNKNOWN;
+          }
           return ID_SHAREDOBJ;
         default:
           error(41,name,ff->tname);  /* illegal fmt. / file corrupted */
@@ -138,13 +134,14 @@ int elf_identify(struct FFFuncs *ff,char *name,void *p,
 }
 
 
-void elf_check_ar_type(struct FFFuncs *ff,const char *name,void *p,
+bool elf_check_ar_type(struct FFFuncs *ff,const char *name,void *p,
                        unsigned char class,unsigned char endian,
                        uint32_t ver,int nmach,...)
 /* check all library archive members before conversion */
 {
   struct Elf_CommonHdr *ehdr = (struct Elf_CommonHdr *)p;
   bool be = (endian == ELFDATA2MSB);
+  bool valid = TRUE;
   uint16_t m = read16(be,ehdr->e_machine);
   va_list vl;
 
@@ -174,10 +171,11 @@ void elf_check_ar_type(struct FFFuncs *ff,const char *name,void *p,
       }
     }
   }
-  error(41,name,ff->tname);
+  valid = FALSE;
 
 check_ar_exit:
   va_end(vl);
+  return valid;
 }
 
 

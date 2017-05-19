@@ -1,16 +1,8 @@
-/* $VER: vlink t_aout.c V0.15b (08.07.16)
+/* $VER: vlink t_aout.c V0.15e (23.03.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2016 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
+ * Copyright (c) 1997-2017  Frank Wille
  */
 
 #include "config.h"
@@ -122,6 +114,7 @@ int aout_identify(struct FFFuncs *ff,char *name,struct aout_hdr *p,
               error(39,name,ff->tname); /* no shared objects in lib archives */
             else
               error(40,name,ff->tname); /* no executables in lib archives */
+            return (ID_UNKNOWN);
           }
           if (fl == EX_DYNAMIC|EX_PIC)
             return (ID_SHAREDOBJ);
@@ -136,7 +129,7 @@ int aout_identify(struct FFFuncs *ff,char *name,struct aout_hdr *p,
 }
 
 
-static void aout_check_ar_type(struct FFFuncs *ff,const char *name,
+static bool aout_check_ar_type(struct FFFuncs *ff,const char *name,
                                struct aout_hdr *hdr)
 /* check all library archive members before conversion */
 {
@@ -148,16 +141,16 @@ static void aout_check_ar_type(struct FFFuncs *ff,const char *name,
           error(39,name,ff->tname); /* no shared objects in lib archives */
         else
           error(40,name,ff->tname); /* no executables in lib archives */
-        return;
+        return FALSE;
       case QMAGIC:
         error(84,name); /* QMAGIC is deprecated */
       case OMAGIC:
-        return;
+        return TRUE;
       default:
         break;
     }
   }
-  error(41,name,ff->tname);
+  return FALSE;
 }
 
 
@@ -713,8 +706,10 @@ void aoutstd_read(struct GlobalVars *gv,struct LinkFile *lf,
   else
     be = fff[lf->format]->endianess;
 
-  if (lf->type == ID_LIBARCH)  /* check ar-member for correct format */
-    aout_check_ar_type(fff[lf->format],lf->pathname,hdr);
+  if (lf->type == ID_LIBARCH) {  /* check ar-member for correct format */
+    if (!aout_check_ar_type(fff[lf->format],lf->pathname,hdr))
+      return;  /* malformatted, so ignore */
+  }
 
   u = create_objunit(gv,lf,lf->objname);
 

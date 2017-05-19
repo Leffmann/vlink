@@ -1,16 +1,8 @@
-/* $VER: vlink linker.c V0.15d (10.01.17)
+/* $VER: vlink linker.c V0.15e (08.05.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
  * Copyright (c) 1997-2017  Frank Wille
- *
- * vlink is freeware and part of the portable and retargetable ANSI C
- * compiler vbcc, copyright (c) 1995-2017 by Volker Barthelmann.
- * vlink may be freely redistributed as long as no modifications are
- * made and nothing is charged for it. Non-commercial usage is allowed
- * without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
- * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  */
 
 
@@ -1535,13 +1527,16 @@ void linker_join(struct GlobalVars *gv)
           int i;
 
           if (sec->size==0 && (*(sec->name)==0 || is_ld_script(sec->obj))) {
-            /* @@@ move section without name and contents into biggest
+            struct Section *lastsec;
+
+            /* @@@ append section without name and contents to the biggest
                LinkedSection - might be a dummy or linker script section
                with abs symbols */
+            lastsec = (struct Section *)maxls->sections.last;
             sec->filldata = gv->filldata;
             sec->lnksec = maxls;
-            sec->va = maxls->relocmem->current;
-            sec->offset = sec->va - maxls->base;
+            sec->va = lastsec->va + lastsec->size;
+            sec->offset = lastsec->offset + lastsec->size;
             addtail(&maxls->sections,remnode(&sec->n));
           }
           else {
