@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.15e (08.05.17)
+/* $VER: vlink linker.c V0.16a (26.07.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -771,7 +771,7 @@ static void ref_all_sections(struct GlobalVars *gv)
       /* flag all referenced sections */
       for (r=(struct Reloc *)sec->xrefs.first;
            r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
-        if (r->relocsect.symbol->relsect != NULL)
+        if (r->relocsect.symbol!=NULL && r->relocsect.symbol->relsect!=NULL)
           r->relocsect.symbol->relsect->flags |= SF_REFERENCED;
       }
       for (r=(struct Reloc *)sec->relocs.first;
@@ -805,7 +805,8 @@ static void ref_section(struct Section *sec)
 
   for (r=(struct Reloc *)sec->xrefs.first;
        r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
-    ref_section(r->relocsect.symbol->relsect);
+    if (r->relocsect.symbol != NULL)
+      ref_section(r->relocsect.symbol->relsect);
   }
 
   for (r=(struct Reloc *)sec->relocs.first;
@@ -836,6 +837,63 @@ static void ref_prot_symbols(struct GlobalVars *gv)
         ref_section(psym->relsect);
     }
   }
+}
+
+
+static void merge_ld_section(struct GlobalVars *gv,uint8_t stype,
+                             struct LinkedSection *ls,struct Section *sec)
+/* Merge Section into a linker-script LinkedSection. */
+{
+  align_address(ls->relocmem,ls->destmem,sec->alignment);
+
+  sec->filldata = gv->filldata;
+  sec->lnksec = ls;
+  sec->va = ls->relocmem->current;
+  sec->offset = sec->va - ls->base;
+  update_address(ls->relocmem,ls->destmem,sec->size);
+
+  /* allocate COMMON symbols, if required */
+  if (is_common_sec(gv,sec) &&
+      (!gv->dest_object || gv->alloc_common) && stype==ST_UDATA) {
+    update_address(ls->relocmem,ls->destmem,
+                   allocate_common(gv,sec,ls->relocmem->current));
+  }
+
+  addtail(&ls->sections,remnode(&sec->n));
+
+  if (!is_ld_script(sec->obj) &&
+      (gv->scriptflags & LDSF_KEEP)) {
+    /* @@@ KEEP for one section will prevent all merged
+       sections from being deleted - ok??? */
+    ls->ld_flags |= LSF_PRESERVE;
+    ls->flags |= SF_ALLOC;  /* @@@ keep implies ALLOC? */
+  }
+}
+
+
+static void merge_seclist(struct GlobalVars *gv,struct list *seclist)
+{
+  struct LinkedSection *ls;
+  struct Section *sec;
+
+  do {
+    bool create_allowed = TRUE;
+
+    for (sec=(struct Section *)seclist->first;
+         sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+      ls = get_matching_lnksec(gv,sec,NULL);
+      if (!ls && create_allowed) {
+        Dprintf("new: %s(%s) -> %s\n",getobjname(sec->obj),
+                sec->name,sec->name);
+        ls = create_lnksect(gv,sec->name,sec->type,sec->flags,
+                            sec->protection,sec->alignment,sec->memattr);
+        create_allowed = FALSE;
+      }
+      if (ls)
+        addtail(&ls->sections,remnode(&sec->n));
+    }
+  }
+  while (!(listempty(seclist)));
 }
 
 
@@ -1018,10 +1076,9 @@ void linker_resolve(struct GlobalVars *gv)
             /* ref. to undefined symbol is only an error for executables */
             if (!gv->dest_object && !gv->dest_sharedobj) {
               if (xref->flags & RELF_WEAK) {
-                /* weak references default to 0 */
-                xdef = addlnksymbol(gv,xref->xrefname,0,SYM_RELOC,0,
-                                    SYMI_NOTYPE,SYMB_LOCAL,0);
-                xdef->relsect = dummy_section(gv,obj);
+                /* weak references default to absolute 0 */
+                xdef = addlnksymbol(gv,xref->xrefname,0,SYM_ABS,0,
+                                    SYMI_NOTYPE,SYMB_GLOBAL,0);
               }
               else {
                 print_function_name(sec,xref->offset);
@@ -1397,33 +1454,43 @@ void linker_join(struct GlobalVars *gv)
        for commands, symbol-definitions and address-assignments. */
 
     while (ls = next_secdef(gv)) {
+      int patalign;
+
       /* Phase 1: read file/section patterns and determine which alignment
          and flags are required for the sections to merge with us */
-      while (test_pattern(gv,&filepattern,&secpatterns)) {
-        for (obj=(struct ObjectUnit *)gv->selobjects.first;
-             obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+      while (patalign = test_pattern(gv,&filepattern,&secpatterns)) {
+        if (patalign < 0) {
+          /* normal case: match selected objects with file/sec. patterns */
+          for (obj=(struct ObjectUnit *)gv->selobjects.first;
+               obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
 
-          if (obj->lnkfile->type != ID_SHAREDOBJ &&
-              pattern_match(filepattern,obj->lnkfile->filename)) {
-            for (sec=(struct Section *)obj->sections.first;
-                 sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
-              if (sec->lnksec==NULL
-                  && patternlist_match(secpatterns,sec->name)) {
-                /* File name and section name are matching the patterns,
-                   so try to merge and check alignments */
-                uint8_t f;
+            if (obj->lnkfile->type != ID_SHAREDOBJ &&
+                pattern_match(filepattern,obj->lnkfile->filename)) {
+              for (sec=(struct Section *)obj->sections.first;
+                   sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+                if (sec->lnksec==NULL
+                    && patternlist_match(secpatterns,sec->name)) {
+                  /* File name and section name are matching the patterns,
+                     so try to merge and check alignments */
+                  uint8_t f;
 
-                if ((f = cmpsecflags(gv,ls,sec)) == 0xff) {
-                  /* no warning, because the linker-script should know... */
-                  f = ls->flags ? ls->flags : sec->flags;
+                  if ((f = cmpsecflags(gv,ls,sec)) == 0xff) {
+                    /* no warning, because the linker-script should know... */
+                    f = ls->flags ? ls->flags : sec->flags;
+                  }
+                  merge_sec_attrs(ls,sec,f&~SF_PORTABLE_MASK);
+                  sec->lnksec = ls;  /* will be reset for phase 2 */
                 }
-                merge_sec_attrs(ls,sec,f&~SF_PORTABLE_MASK);
-                sec->lnksec = ls;  /* will be reset for phase 2 */
               }
             }
           }
+          free_patterns(filepattern,secpatterns);
         }
-        free_patterns(filepattern,secpatterns);
+        else {
+          /* A data command (BYTE, SHORT, etc.) defined an alignment */
+          if (patalign > ls->alignment)
+            ls->alignment = patalign;
+        }
       }
 
       /* align this section to the maximum required alignment */
@@ -1453,55 +1520,33 @@ void linker_join(struct GlobalVars *gv)
       }
 
       /* Phase 2: read next patterns and merge matching sections for real */
-      while (next_pattern(gv,&filepattern,&secpatterns)) {
-        /* For each pattern, merge ST_CODE first, then ST_DATA and */
-        /* ST_UDATA at last, to keep uninitialized sections together. */
-        for (stype=0; stype<=ST_LAST; stype++) {
-          for (obj=(struct ObjectUnit *)gv->selobjects.first;
-               obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+      while ((sec = next_pattern(gv,&filepattern,&secpatterns)) != NULL) {
+        if (sec == VALIDPAT) {
+          /* For each pattern, merge ST_CODE first, then ST_DATA and */
+          /* ST_UDATA at last, to keep uninitialized sections together. */
+          for (stype=0; stype<=ST_LAST; stype++) {
+            for (obj=(struct ObjectUnit *)gv->selobjects.first;
+                 obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
 
-            if (obj->lnkfile->type != ID_SHAREDOBJ &&
-                pattern_match(filepattern,obj->lnkfile->filename)) {
-              sec = (struct Section *)obj->sections.first;
-              while (nextsec = (struct Section *)sec->n.next) {
-                if (sec->lnksec==NULL
-                    && patternlist_match(secpatterns,sec->name)
-                    && sec->type==stype) {
-
-                  /* File name and section name are matching the patterns,
-                     so join it into the current LinkedSection. */
-                  align_address(ls->relocmem,ls->destmem,sec->alignment);
-                  sec->filldata = gv->filldata;
-                  sec->lnksec = ls;
-                  sec->va = ls->relocmem->current;
-                  sec->offset = sec->va - ls->base;
-                  update_address(ls->relocmem,ls->destmem,sec->size);
-
-                  /* allocate COMMON symbols, if required */
-                  if (is_common_sec(gv,sec) &&
-                      (!gv->dest_object || gv->alloc_common) &&
-                      stype==ST_UDATA) {
-                    update_address(ls->relocmem,ls->destmem,
-                                   allocate_common(gv,sec,
-                                                   ls->relocmem->current));
+              if (obj->lnkfile->type != ID_SHAREDOBJ &&
+                  pattern_match(filepattern,obj->lnkfile->filename)) {
+                sec = (struct Section *)obj->sections.first;
+                while (nextsec = (struct Section *)sec->n.next) {
+                  if (sec->lnksec==NULL && sec->type==stype &&
+                      patternlist_match(secpatterns,sec->name)) {
+                    /* File name and section name are matching the patterns,
+                       so join it into the current LinkedSection. */
+                    merge_ld_section(gv,stype,ls,sec);
                   }
-
-                  addtail(&ls->sections,remnode(&sec->n));
-
-                  if (!is_ld_script(sec->obj) &&
-                      (gv->scriptflags & LDSF_KEEP)) {
-                  /* @@@ KEEP for one section will prevent all merged
-                     sections from being deleted - ok??? */
-                    ls->ld_flags |= LSF_PRESERVE;
-                    ls->flags |= SF_ALLOC;  /* @@@ keep implies ALLOC? */
-                  }
+                  sec = nextsec;
                 }
-                sec = nextsec;
               }
             }
           }
+          free_patterns(filepattern,secpatterns);
         }
-        free_patterns(filepattern,secpatterns);
+        else  /* merge art. section created by a data command */
+          merge_ld_section(gv,~0,ls,sec);
 
         /* keep section size up to date */
         ls->size = ls->relocmem->current - ls->base;
@@ -1564,12 +1609,10 @@ void linker_join(struct GlobalVars *gv)
     unsigned long va = 0;
     bool baseincr = (fff[gv->dest_format]->flags&FFF_BASEINCR) != 0;
     struct LinkedSection *ls,*newls;
+    struct list seclist;
 
-    /* join sections, beginning with ST_CODE, then ST_DATA and ST_UDATA */
-    for (stype=0; stype<=ST_LAST; stype++) {
-      struct list seclist;
-
-      /* collect all sections of current type */
+    if (gv->keep_sect_order) {
+      /* Make sure to keep the section order as found on the command line. */
       initlist(&seclist);
       for (obj=(struct ObjectUnit *)gv->selobjects.first;
            obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
@@ -1577,32 +1620,36 @@ void linker_join(struct GlobalVars *gv)
         if (obj->lnkfile->type != ID_SHAREDOBJ) {
           sec = (struct Section *)obj->sections.first;
           while (nextsec = (struct Section *)sec->n.next) {
-            if (sec->type == stype)
-              addtail(&seclist,remnode(&sec->n));
+            addtail(&seclist,remnode(&sec->n));
             sec = nextsec;
           }
         }
       }
-
       /* Phase 1: link sec. which fit together, obeying target linking rules*/
-      do {
-        bool create_allowed = TRUE;
+      merge_seclist(gv,&seclist);
+    }
+    else {
+      /* Join sections, beginning with ST_CODE, then ST_DATA and ST_UDATA. */
+      for (stype=0; stype<=ST_LAST; stype++) {
 
-        for (sec=(struct Section *)seclist.first;
-             sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
-          ls = get_matching_lnksec(gv,sec,NULL);
-          if (!ls && create_allowed) {
-            Dprintf("new: %s(%s) -> %s\n",getobjname(sec->obj),
-                    sec->name,sec->name);
-            ls = create_lnksect(gv,sec->name,sec->type,sec->flags,
-                                sec->protection,sec->alignment,sec->memattr);
-            create_allowed = FALSE;
+        /* collect all sections of current type */
+        initlist(&seclist);
+        for (obj=(struct ObjectUnit *)gv->selobjects.first;
+             obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
+
+          if (obj->lnkfile->type != ID_SHAREDOBJ) {
+            sec = (struct Section *)obj->sections.first;
+            while (nextsec = (struct Section *)sec->n.next) {
+              if (sec->type == stype)
+                addtail(&seclist,remnode(&sec->n));
+              sec = nextsec;
+            }
           }
-          if (ls)
-            addtail(&ls->sections,remnode(&sec->n));
         }
+
+        /* Phase 1: link sec. which fit together, obeying target linking rules*/
+        merge_seclist(gv,&seclist);
       }
-      while (!(listempty(&seclist)));
     }
 
     /* Phase 2: resolve dependencies between created LinkedSections */

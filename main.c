@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.15d (09.01.17)
+/* $VER: vlink main.c V0.16a (08.07.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -310,6 +310,10 @@ int main(int argc,char *argv[])
             gv->interp_path = get_arg(argc,argv,&i);
           else
             error(2,argv[i]);  /* unrecognized option */
+          break;
+
+        case 'k':
+          gv->keep_sect_order = TRUE;
           break;
 
         case 'l':  /* library specifier */

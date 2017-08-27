@@ -14,6 +14,16 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.16a (14.08.17)
+o New linker script commands: BYTE, SHORT, LONG, QUAD, SQUAD.
+o New option -k: keep original section order from the objects.
+o Fixed crash with -gc-all and unreferenced symbols.
+o Fixed crash with unresolved weak symbols.
+o (ados/ehf) _INIT/_EXIT functions with register arguments (prefixed by
+  '@' instead of '_' for SAS/C-compatibility) are also detected, and their
+  pointers inserted into the proper con-/destructor tables.
+o (elf) Provide __CTOR_LIST_END, __DTOR_LIST_END.
+
 - 0.16 (16.05.17)
 o Fixed a potential crash when linking with empty object files, while
   using a linker script.

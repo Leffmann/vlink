@@ -62,7 +62,8 @@ static const size_t elf_buckets[] =
 
 /* common linker symbols */
 static const char *elf_symnames[] = {
-  sdabase_name,sda2base_name,"__CTOR_LIST__","__DTOR_LIST__",
+  sdabase_name,sda2base_name,
+  "__CTOR_LIST__","__DTOR_LIST__","__CTOR_LIST_END","__DTOR_LIST_END",
   gotbase_name+1,pltbase_name+1,dynamic_name+1
 };
 
@@ -390,6 +391,22 @@ void elf_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
         if (ls = find_lnksec(gv,dtors_name,0,0,0,0)) {
           xdef->type = SYM_RELOC;
           xdef->relsect = (struct Section *)ls->sections.first;
+        }
+        break;
+      case CTOREND:
+        if (ls = find_lnksec(gv,ctors_name,0,0,0,0)) {
+          xdef->type = SYM_RELOC;
+          xdef->relsect = (struct Section *)ls->sections.last;
+          if (xdef->relsect->size >= 4)
+            xdef->value = xdef->relsect->size - 4;
+        }
+        break;
+      case DTOREND:
+        if (ls = find_lnksec(gv,dtors_name,0,0,0,0)) {
+          xdef->type = SYM_RELOC;
+          xdef->relsect = (struct Section *)ls->sections.last;
+          if (xdef->relsect->size >= 4)
+            xdef->value = xdef->relsect->size - 4;
         }
         break;
       case GLOBOFFSTAB:

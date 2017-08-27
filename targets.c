@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.15d (10.01.17)
+/* $VER: vlink targets.c V0.16a (17.06.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -1179,46 +1179,11 @@ static int vbcc_xtors_pri(const char *s)
 }
 
 
-static void add_vbcc_xtors(struct GlobalVars *gv,struct list *objlist,
-                           const char *cname,const char *dname,
-                           const char *csecname,const char *dsecname,
-                           const char *clabel,const char *dlabel)
-{
-  struct ObjectUnit *obj;
-  int clen = strlen(cname);
-  int dlen = strlen(dname);
-  int i;
-
-  for (obj=(struct ObjectUnit *)objlist->first;
-       obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
-    for (i=0; i<OBJSYMHTABSIZE; i++) {
-      struct Symbol *sym = obj->objsyms[i];
-
-      while (sym) {
-        if (sym->bind==SYMB_GLOBAL) {
-          if (!strncmp(sym->name,cname,clen)) {
-            new_priptr(obj,csecname,clabel,vbcc_xtors_pri(sym->name+clen),
-                       sym->name,0);
-          }
-          else if (!strncmp(sym->name,dname,dlen))
-            new_priptr(obj,dsecname,dlabel,vbcc_xtors_pri(sym->name+dlen),
-                       sym->name,0);
-        }
-        sym = sym->obj_chain;
-      }
-    }
-
-    if (objlist == &gv->selobjects)
-      add_priptrs(gv,obj);  /* con-/destructors are already known */
-  }
-}
-
-
 static int sasc_xtors_pri(const char *s)
 /* Return priority of a SAS/C constructor/destructor function name.
    Its priority may be specified by a number behind the 2nd underscore.
    For SAS/C a lower value means higher priority!
-   Example: _INIT_110_OpenLibs (constructor with priority 110) */
+   Example: _STI_110_OpenLibs (constructor with priority 110) */
 {
   if (*s++ == '_')
     if (isdigit((unsigned)*s))
@@ -1227,10 +1192,11 @@ static int sasc_xtors_pri(const char *s)
 }
 
 
-static void add_sasc_xtors(struct GlobalVars *gv,struct list *objlist,
-                           const char *cname,const char *dname,
-                           const char *csecname,const char *dsecname,
-                           const char *clabel,const char *dlabel)
+static void add_xtors(struct GlobalVars *gv,struct list *objlist,
+                      int (*xtors_pri)(const char *),int elf,
+                      const char *cname,const char *dname,
+                      const char *csecname,const char *dsecname,
+                      const char *clabel,const char *dlabel)
 {
   struct ObjectUnit *obj;
   int clen = strlen(cname);
@@ -1241,23 +1207,26 @@ static void add_sasc_xtors(struct GlobalVars *gv,struct list *objlist,
        obj->n.next!=NULL; obj=(struct ObjectUnit *)obj->n.next) {
     for (i=0; i<OBJSYMHTABSIZE; i++) {
       struct Symbol *sym = obj->objsyms[i];
+      const char *p;
 
       while (sym) {
         if (sym->bind==SYMB_GLOBAL) {
-          if (!strncmp(sym->name,cname,clen)) {
-            new_priptr(obj,csecname,clabel,sasc_xtors_pri(sym->name+clen),
-                       sym->name,0);
-          }
-          else if (!strncmp(sym->name,dname,dlen))
-            new_priptr(obj,dsecname,dlabel,sasc_xtors_pri(sym->name+dlen),
-                       sym->name,0);
+          p = sym->name;
+          if (!elf && (*p=='_' || *p=='@'))
+            p++;
+          if (!strncmp(p,cname,clen))
+            new_priptr(obj,csecname,clabel,xtors_pri(p+clen),sym->name,0);
+          else if (!strncmp(p,dname,dlen))
+            new_priptr(obj,dsecname,dlabel,xtors_pri(p+dlen),sym->name,0);
         }
         sym = sym->obj_chain;
       }
     }
 
+    /* Con-/destructors from selobjects are already known to the linker.
+       The rest is added when their objects are pulled in from a library. */
     if (objlist == &gv->selobjects)
-      add_priptrs(gv,obj);  /* con-/destructors are already known */
+      add_priptrs(gv,obj);
   }
 }
 
@@ -1267,14 +1236,15 @@ void collect_constructors(struct GlobalVars *gv)
    and destructor functions of the required type. */
 {
   if (!gv->dest_object) {
-    const char *sasc_ctor = "__STI";
-    const char *sasc_dtor = "__STD";
-    const char *vbcc_ctor = "__INIT";
-    const char *vbcc_dtor = "__EXIT";
-    const char *ctor_label = "___CTOR_LIST__";
-    const char *dtor_label = "___DTOR_LIST__";
     const char *csec = xtors_secname(gv,ctors_name);
     const char *dsec = xtors_secname(gv,dtors_name);
+    const char *sasc_ctor = "_STI";
+    const char *sasc_dtor = "_STD";
+    const char *vbcc_ctor = "_INIT";
+    const char *vbcc_dtor = "_EXIT";
+    const char *ctor_label = "___CTOR_LIST__";
+    const char *dtor_label = "___DTOR_LIST__";
+    int elf = 0;
 
     switch (gv->collect_ctors_type) {
 
@@ -1285,27 +1255,26 @@ void collect_constructors(struct GlobalVars *gv)
         break;  /* @@@ already put into .ctors/.dtors anyway? */
 
       case CCDT_VBCC_ELF:  /* no leading underscores */
-        vbcc_ctor++;
-        vbcc_dtor++;
+        elf = 1;
         ctor_label++;
         dtor_label++;
       case CCDT_VBCC:
         add_xtor_sym(gv,1,ctor_label);  /* define __CTOR_LIST__ */
-        add_vbcc_xtors(gv,&gv->selobjects,
-                       vbcc_ctor,vbcc_dtor,csec,dsec,ctor_label,dtor_label);
         add_xtor_sym(gv,0,dtor_label);  /* define __DTOR_LIST__ */
-        add_vbcc_xtors(gv,&gv->libobjects,
-                       vbcc_ctor,vbcc_dtor,csec,dsec,ctor_label,dtor_label);
+        add_xtors(gv,&gv->selobjects,vbcc_xtors_pri,elf,
+                  vbcc_ctor,vbcc_dtor,csec,dsec,ctor_label,dtor_label);
+        add_xtors(gv,&gv->libobjects,vbcc_xtors_pri,elf,
+                  vbcc_ctor,vbcc_dtor,csec,dsec,ctor_label,dtor_label);
         break;
 
       case CCDT_SASC:
         /* ___ctors/___dtors will be directed to __CTOR_LIST__/__DTOR_LIST */
         add_xtor_sym(gv,1,ctor_label);  /* define __CTOR_LIST__ */
-        add_sasc_xtors(gv,&gv->selobjects,
-                       sasc_ctor,sasc_dtor,csec,dsec,ctor_label,dtor_label);
         add_xtor_sym(gv,0,dtor_label);  /* define __DTOR_LIST__ */
-        add_sasc_xtors(gv,&gv->libobjects,
-                       sasc_ctor,sasc_dtor,csec,dsec,ctor_label,dtor_label);
+        add_xtors(gv,&gv->selobjects,sasc_xtors_pri,0,
+                  sasc_ctor,sasc_dtor,csec,dsec,ctor_label,dtor_label);
+        add_xtors(gv,&gv->libobjects,sasc_xtors_pri,0,
+                  sasc_ctor,sasc_dtor,csec,dsec,ctor_label,dtor_label);
         break;
 
       default:
@@ -1644,6 +1613,7 @@ struct Section *abs_section(struct ObjectUnit *ou)
 }
 
 
+#if UNUSED
 struct Section *dummy_section(struct GlobalVars *gv,struct ObjectUnit *ou)
 /* Make a dummy section already attached to a dummy-LinkedSection, which
    won't appear in any section lists.
@@ -1671,6 +1641,7 @@ struct Section *dummy_section(struct GlobalVars *gv,struct ObjectUnit *ou)
   }
   return s;
 }
+#endif
 
 
 struct LinkedSection *create_lnksect(struct GlobalVars *gv,const char *name,

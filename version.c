@@ -1,4 +1,4 @@
-/* $VER: vlink version.c V0.15e (23.03.17)
+/* $VER: vlink version.c V0.16a (08.07.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -7,7 +7,7 @@
 
 
 /* version/revision */
-#define VERSION "0.16"
+#define VERSION "0.16a"
 
 #define VERSION_C
 #include "vlink.h"
@@ -30,7 +30,7 @@ void show_usage(void)
 {
   show_version();
 
-  printf("Usage: " PNAME " [-dhnqrstvwxMRSXZ] [-B linkmode] [-b targetname] "
+  printf("Usage: " PNAME " [-dhknqrstvwxMRSXZ] [-B linkmode] [-b targetname] "
          "[-baseoff offset] [-C constructor-type] "
 #if 0 /* not implemented */
          "[-D symbol[=value]] "
@@ -94,13 +94,14 @@ void show_usage(void)
          "-sc               merge all code sections\n"
          "-sd               merge all data and bss sections\n"
          "-mrel             merge sections with pc-relative references\n"
-         "-t                trace file accesses by the linker\n"
          "-M                print segment mappings and symbol values\n"
+         "-k                keep original section order\n"
          "-n                no page alignment\n"
          "-q                keep relocations in the final executable\n"
          "-r                generate relocatable object\n"
          "-s                strip all symbols\n"
          "-S                strip debugging symbols only\n"
+         "-t                trace file accesses by the linker\n"
          "-x                discard all local symbols\n"
          "-X                discard temporary local symbols\n"
          "-w                suppress warnings\n"

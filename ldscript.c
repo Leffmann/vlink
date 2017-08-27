@@ -1,8 +1,8 @@
-/* $VER: vlink ldscript.c V0.14b (29.08.13)
+/* $VER: vlink ldscript.c V0.16a (07.07.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2013  Frank Wille
+ * Copyright (c) 1997-2017  Frank Wille
  */
 
 
@@ -24,6 +24,10 @@ static bool preparse;     /* no sym-assignments in SECTIONS when true */
 static int level;         /* 0=outside SECTIONS,1=inside,2=section def. */
 static struct LinkedSection *current_ls; /* current section in work */
 static const char *new_ls_name = NULL;   /* just defined sect. name (pass 1) */
+
+/* BYTE, SHORT, LONG, etc. data commands */
+static int datasize,dataalign;  /* datasize > 0 enables data command */
+static lword dataval;
 
 /* for 2nd pass over the SECTIONS block during linking: */
 static char *secblkbase;
@@ -75,19 +79,28 @@ static void sc_fill(struct GlobalVars *);
 static void sc_input(struct GlobalVars *);
 static void sc_provide(struct GlobalVars *);
 static void sc_searchdir(struct GlobalVars *);
+static void sc_byte(struct GlobalVars *);
+static void sc_short(struct GlobalVars *);
+static void sc_long(struct GlobalVars *);
+static void sc_quad(struct GlobalVars *);
 
 struct ScriptCmd ldCommands[] = {
   { "ASSERT",SCMDF_PAREN|SCMDF_GLOBAL,sc_assert },
+  { "BYTE",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_SECDEF,sc_byte },
   { "CONSTRUCTORS",SCMDF_GLOBAL,sc_ctors_gnu },
   { "ENTRY",SCMDF_PAREN|SCMDF_GLOBAL,sc_entry },
   { "EXTERN",SCMDF_PAREN|SCMDF_GLOBAL,sc_extern },
   { "FILL",SCMDF_PAREN|SCMDF_GLOBAL,sc_fill },
-  { "INPUT",SCMDF_PAREN|SCMDF_GLOBAL,sc_input },
   { "GROUP",SCMDF_PAREN|SCMDF_GLOBAL,sc_input },
+  { "INPUT",SCMDF_PAREN|SCMDF_GLOBAL,sc_input },
+  { "LONG",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_SECDEF,sc_long },
   { "OUTPUT_ARCH",SCMDF_PAREN|SCMDF_GLOBAL,NULL },
   { "OUTPUT_FORMAT",SCMDF_PAREN|SCMDF_GLOBAL,NULL },
   { "PROVIDE",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_GLOBAL,sc_provide },
+  { "QUAD",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_SECDEF,sc_quad },
   { "SEARCH_DIR",SCMDF_PAREN|SCMDF_GLOBAL,sc_searchdir },
+  { "SHORT",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_SECDEF,sc_short },
+  { "SQUAD",SCMDF_PAREN|SCMDF_SEMIC|SCMDF_SECDEF,sc_quad },
   { "VBCC_CONSTRUCTORS",SCMDF_GLOBAL,sc_ctors_vbcc },
   { "VBCC_CONSTRUCTORS_ELF",SCMDF_GLOBAL,sc_ctors_vbcc_elf },
   { NULL,0,NULL }
@@ -403,7 +416,9 @@ static void skip_expr(int provided)
   do {
     c = getchr();
   }
-  while (c!=';' && c!='\0');
+  while (c!=';' && c!='}' && c!='\0');
+  if (c != ';')
+    error(66,scriptname,getlineno(),';');  /* ';' expected */   
 }
 
 
@@ -779,6 +794,60 @@ static void sc_fill(struct GlobalVars *gv)
 }
 
 
+static bool get_dataval(void)
+{
+  if (startofblock('(')) {
+    struct LinkedSection *cls = current_ls;
+    struct MemoryDescr *md = cls ? cls->relocmem : vdefmem;
+
+    if (!preparse)
+      parse_expr(md->current,&dataval);
+    return endofblock('(',')');
+  }
+  return FALSE;
+}
+
+
+static void sc_byte(struct GlobalVars *gv)
+/* BYTE(data8) */
+{
+  if (get_dataval()) {
+    datasize = 1;
+    dataalign = 0;
+  }
+}
+
+
+static void sc_short(struct GlobalVars *gv)
+/* SHORT(data16) */
+{
+  if (get_dataval()) {
+    datasize = 2;
+    dataalign = 0;  /* @@@ */
+  }
+}
+
+
+static void sc_long(struct GlobalVars *gv)
+/* LONG(data32) */
+{
+  if (get_dataval()) {
+    datasize = 4;
+    dataalign = 0;  /* @@@ */
+  }
+}
+
+
+static void sc_quad(struct GlobalVars *gv)
+/* QUAD(data64) */
+{
+  if (get_dataval()) {
+    datasize = 8;
+    dataalign = 0;  /* @@@ */
+  }
+}
+
+
 static void sc_input(struct GlobalVars *gv)
 /* INPUT(file1 [file2...]) */
 {
@@ -1101,6 +1170,7 @@ static int check_command(struct GlobalVars *gv,char *name,uint32_t flags)
 {
   struct ScriptCmd *scptr;
 
+  datasize = 0;
   for (scptr=ldCommands; scptr->name; scptr++) {
     if (!strcmp(scptr->name,name))
       break;
@@ -1433,8 +1503,11 @@ static void add_section_to_segments(struct GlobalVars *gv,
   struct Phdr *p,*p2;
   bool loadseg_present = FALSE;
 
-  if (!(ls->flags & SF_ALLOC) || ls->type==ST_UNDEFINED)
-    return; /* non-allocated or empty sections are not part of any segment! */
+  if (!(ls->flags & SF_ALLOC) || ls->type==ST_UNDEFINED) {
+    /* non-allocated or undefined sections are not part of any segment! */
+    ls->flags &= ~SF_ALLOC;
+    return;
+  }
 
   while (p = *pp++) {
     if (p->flags & PHDR_CLOSED) {
@@ -1627,10 +1700,40 @@ static bool parse_pattern(struct GlobalVars *gv,char *keyword,
 }
 
 
+static struct Section *make_data_element(struct GlobalVars *gv)
+/* Construct a section for a new data element (BYTE, SHORT, ...) */
+{
+  bool be = fff[gv->dest_format]->endianess == _BIG_ENDIAN_;
+  uint8_t *data = alloc(datasize);
+  struct Section *sec;
+  const char *name;
+
+  #if !DUMMY_SEC_FROM_PATTERN
+  if (listempty(&current_ls->sections))
+    name = get_dummy_sec(current_ls->name);
+  else
+  #endif
+    name = ((struct Section *)current_ls->sections.first)->name;
+
+  switch (datasize) {
+    case 1: *data = dataval; break;
+    case 2: write16(be,data,dataval); break;
+    case 4: write32(be,data,dataval); break;
+    case 8: write64(be,data,dataval); break;
+    default: ierror("make_data_element"); break;
+  }
+
+  sec = create_section(script_obj,name,data,datasize);
+  addtail(&script_obj->sections,&sec->n);
+  return sec;
+}
+
+
 int test_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
-/* Returns next file/section-patterns, but doesn't execute any commands
+/* Provides next file/section-patterns, but doesn't execute any commands
    or assignments. It will remember the initial parsing state to
-   do it a second time for real with next_pattern(). */
+   do it a second time for real with next_pattern().
+   Return Codes: 0=no more patterns, -1=pattern, >0=alignment */
 {
   char c,*keyword;
 
@@ -1644,7 +1747,9 @@ int test_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
 
   do {
     while (keyword = getpattern()) {
-      if (check_command(gv,keyword,SCMDF_IGNORE)) {
+      if (check_command(gv,keyword,SCMDF_IGNORE|SCMDF_SECDEF)) {
+        if (datasize)
+          return dataalign;
         continue;
       }
       else {
@@ -1654,7 +1759,7 @@ int test_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
         }
         else if (c == '(') {
           if (parse_pattern(gv,keyword,fpat,spatlist))
-            return 1;
+            return -1;
         }
         else {
           /* unknown keyword ignored */
@@ -1672,8 +1777,11 @@ int test_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
 }
 
 
-int next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
-/* Returns next file-pattern and a list of section-patterns, when present */
+struct Section *next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
+/* Provides next file-pattern and a list of section-patterns, when present.
+   Returns NULL, when section definition is closed,
+   a section pointer for a data element to insert (BYTE, SHORT, LONG, ...),
+   and VALIDPAT for valid file/section-patterns in fpat/spatlist. */
 {
   static char *fn = "next_pattern(): ";
   static struct Phdr **defplist=NULL;
@@ -1692,6 +1800,8 @@ int next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
   do {
     while (keyword = getpattern()) {
       if (check_command(gv,keyword,SCMDF_GLOBAL|SCMDF_SECDEF)) {
+        if (datasize)
+          return make_data_element(gv);
         continue;
       }
       else {
@@ -1701,7 +1811,7 @@ int next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
         }
         else if (c == '(') {
           if (parse_pattern(gv,keyword,fpat,spatlist))
-            return 1;
+            return VALIDPAT;
         }
         else
           back(1);
@@ -1790,7 +1900,7 @@ int next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
   vdefmem = current_ls->relocmem;
   ldefmem = current_ls->destmem;
   current_ls = NULL;
-  return 0;
+  return NULL;
 }
 
 

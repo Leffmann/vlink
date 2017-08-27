@@ -1,4 +1,4 @@
-/* $VER: vlink vlink.h V0.15d (10.01.17)
+/* $VER: vlink vlink.h V0.16a (08.07.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -486,7 +486,7 @@ struct GlobalVars {
   bool auto_merge;              /* merge sections with pc-rel. references */
   uint8_t gc_sects;             /* garbage-collect unreferenced sections */
   bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
-  uint8_t opt_reserved[1];
+  bool keep_sect_order;         /* keep order of section as found in objs */
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   struct SymNames **trace_syms; /* trace-symbol hash table */
@@ -920,11 +920,13 @@ extern void align_address(struct MemoryDescr *,struct MemoryDescr *,
                           unsigned long);
 extern void free_patterns(char *,char **);
 extern int test_pattern(struct GlobalVars *,char **,char ***);
-extern int next_pattern(struct GlobalVars *,char **,char ***);
+extern struct Section *next_pattern(struct GlobalVars *,char **,char ***);
 extern struct LinkedSection *next_secdef(struct GlobalVars *);
 extern void init_secdef_parse(struct GlobalVars *);
 extern void init_ld_script(struct GlobalVars *);
 #endif
+/* return value for valid file/section patterns from next_pattern() */
+#define VALIDPAT (struct Section *)1
 
 /* pmatch.c */
 #ifndef PMATCH_C

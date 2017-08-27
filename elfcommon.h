@@ -316,9 +316,11 @@ struct ELF2vlink {
 #define SDA2BASE        1   /* _SDA2_BASE_ */
 #define CTORS           2   /* __CTOR_LIST__ */
 #define DTORS           3   /* __DTOR_LIST__ */
-#define GLOBOFFSTAB     4   /* _GLOBAL_OFFSET_TABLE_ */
-#define PROCLINKTAB     5   /* _PROCEDURE_LINKAGE_TABLE_ */
-#define DYNAMICSYM      6   /* _DYNAMIC */
+#define CTOREND         4   /* __CTOR_LIST_END */
+#define DTOREND         5   /* __DTOR_LIST_END */
+#define GLOBOFFSTAB     6   /* _GLOBAL_OFFSET_TABLE_ */
+#define PROCLINKTAB     7   /* _PROCEDURE_LINKAGE_TABLE_ */
+#define DYNAMICSYM      8   /* _DYNAMIC */
 
 
 /* global data from t_elf.c */

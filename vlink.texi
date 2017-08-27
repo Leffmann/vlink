@@ -450,6 +450,12 @@ Defines the name of the interpreter, which is usually the
 dynamic linker for dynamically linked ELF executables.
 Defaults to @file{/usr/lib/ld.so.1}.
 
+@item -k
+Keeps the original section order as found in the object files from the
+command line. Otherwise vlink links all code sections first, then all data
+and finally all bss, even when the first object starts with data.
+Has no meaning when using a linker script!
+
 @item -L library-search-path
 Add path to the list of directories to search for libraries
 specified with the @option{-l} option. When a default search path
@@ -573,16 +579,21 @@ to that used in GNU linker scripts.
 Supported commands:
 @itemize @minus
   @item ASSERT
+  @item BYTE
   @item CONSTRUCTORS
   @item ENTRY
   @item EXTERN
   @item FILL
-  @item INPUT
   @item GROUP
+  @item INPUT
+  @item LONG
   @item OUTPUT_ARCH
   @item OUTPUT_FORMAT
   @item PROVIDE
+  @item QUAD
   @item SEARCH_DIR
+  @item SHORT
+  @item SQUAD
   @item VBCC_CONSTRUCTORS
   @item VBCC_CONSTRUCTORS_ELF
 @end itemize
