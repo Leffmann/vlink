@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.16a (26.07.17)
+/* $VER: vlink linker.c V0.16b (29.12.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -453,6 +453,11 @@ static struct LinkedSection *get_matching_lnksec(struct GlobalVars *gv,
           if (!gv->multibase && (lsn->flags & sec->flags & SF_SMALLDATA)) {
             Dprintf("sd-refs: %s(%s) -> %s\n",getobjname(sec->obj),
                     sec->name,lsn->name);
+            merge_sec_attrs(lsn,sec,f);
+            return (lsn);
+          }
+
+          if (gv->merge_same_type && lsn->type==sec->type) {
             merge_sec_attrs(lsn,sec,f);
             return (lsn);
           }

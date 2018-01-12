@@ -1,4 +1,4 @@
-/* $VER: vlink vlink.h V0.16a (08.07.17)
+/* $VER: vlink vlink.h V0.16b (29.12.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -484,9 +484,11 @@ struct GlobalVars {
   bool output_sections;         /* output each section as a new file */
   uint8_t min_alignment;        /* minimal section alignment (default 0) */
   bool auto_merge;              /* merge sections with pc-rel. references */
+  bool merge_same_type;         /* merge all sections of same type */
   uint8_t gc_sects;             /* garbage-collect unreferenced sections */
   bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
   bool keep_sect_order;         /* keep order of section as found in objs */
+  uint8_t reserved;
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   struct SymNames **trace_syms; /* trace-symbol hash table */

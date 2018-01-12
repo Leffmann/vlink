@@ -293,7 +293,7 @@ specific relocations.
   [-e entrypoint] [-export-dynamic] [-f flavour] [-fixunnamed]
   [-F filename] [-gc-all] [-gc-empty] [-hunkattr secname=value]
   [-interp path] [-L library-search-path] [-l library-specifier]
-  [-minalign val] [-mrel] [-multibase] [-nostdlib]
+  [-minalign val] [-mrel] [-mtype] [-multibase] [-nostdlib]
   [-o filename] [-rpath path] [-sc] [-sd] [-shared] [-soname name]
   [-static] [-T filename] [-Ttext addr] [-textbaserel]
   [-tos-flags/fastload/fastram/private/global/super/readable]
@@ -485,6 +485,10 @@ effect when higher than the section's current alignment. It defaults to 0.
 @item -mrel
 Automatically merge sections, when there are PC-relative references
 between them.
+
+@item -mtype
+Merge all sections of the same type (code, data, bss), even when
+their names or attributes differ.
 
 @item -multibase
 The default behaviour of @command{vlink} is to merge all sections

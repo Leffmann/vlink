@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.16a (08.07.17)
+/* $VER: vlink main.c V0.16b (29.12.17)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -338,6 +338,8 @@ int main(int argc,char *argv[])
           }
           else if (!strcmp(&argv[i][2],"rel"))
             gv->auto_merge = TRUE;
+          else if (!strcmp(&argv[i][2],"type"))
+            gv->merge_same_type = TRUE;
           else if (!strcmp(&argv[i][2],"ultibase"))
             gv->multibase = TRUE;
           else

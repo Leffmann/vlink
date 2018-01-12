@@ -14,6 +14,10 @@ vlink history
 (tos):        changes for the Atari TOS format
 
 
+- 0.16b (29.12.17)
+o New option -mtype: merge all sections of the same type (code, data,
+  bss), ignoring name and attributes.
+
 - 0.16a (14.08.17)
 o New linker script commands: BYTE, SHORT, LONG, QUAD, SQUAD.
 o New option -k: keep original section order from the objects.
