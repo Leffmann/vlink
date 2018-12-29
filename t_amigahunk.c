@@ -1,8 +1,8 @@
-/* $VER: vlink t_amigahunk.c V0.15e (12.04.17)
+/* $VER: vlink t_amigahunk.c V0.16b (01.04.18)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2018  Frank Wille
  */
 
 
@@ -625,10 +625,18 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
         if (hi.hunkptr == hi.hunkbase) {
           if (!s) {
             uint32_t n;
-            add_objunit(gv,u,TRUE); /* add last one to glob. ObjUnit list */
+
+            if (hi.exec) {  /* appears usually in an executable */
+              if (u)
+                ierror("readconv(): there shouldn't be any unit yet");
+              u = create_objunit(gv,lf,lf->filename);
+            }
+            else {  /* HUNK_HEADER in object files? */
+              add_objunit(gv,u,TRUE); /* add last one to glob. ObjUnit list */
+              create_objunit(gv,lf,lf->filename);
+              u = NULL;
+            }
             index = 0;
-            create_objunit(gv,lf,lf->filename);
-            u = NULL;
             nextword32(&hi);
             n = nextword32(&hi);
             movehunkptr32(&hi,n?n+2:1);
@@ -1228,7 +1236,8 @@ static void get_resident_sdrelocs(struct GlobalVars *gv)
             }
           }
           else {
-            if (xdef->relsect->lnksec==sdsec && r->rtype==R_ABS)
+            if (r->rtype==R_ABS && xdef->relsect!=NULL &&
+                xdef->relsect->lnksec==sdsec)
               /* absolute reference to resident data section */
               error(134,getobjname(sec->obj),sec->name,r->offset,xdef->name);
           }

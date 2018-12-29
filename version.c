@@ -1,8 +1,8 @@
-/* $VER: vlink version.c V0.16b (29.12.17)
+/* $VER: vlink version.c V0.16b (28.12.18)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2018  Frank Wille
  */
 
 
@@ -21,7 +21,7 @@ static const char *_ver = "$VER: " PNAME " " VERSION " " __AMIGADATE__ "\r\n";
 
 void show_version(void)
 {
-  printf(PNAME " V" VERSION " (c)1997-2017 by Frank Wille\n"
+  printf(PNAME " V" VERSION " (c)1997-2018 by Frank Wille\n"
          "build date: " __DATE__ ", " __TIME__ "\n\n");
 }
 
