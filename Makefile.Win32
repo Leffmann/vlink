@@ -1,4 +1,5 @@
 # Windows
+# Tested with Visual Studio 2017 : Works but need to remove '/Dsnprintf=_snprintf' in the options
 # Tested with Visual Studio 2005 Express and Professional Edition: works fine
 # Tested with Visual C++ Toolkit 2003: works fine, but needs an external make tool (nmake is not included)
 
@@ -14,8 +15,10 @@ MD = mkdir
 
 CC = cl
 CCOUT = /Fo
-#COPTS = /nologo /O2 /MT /Zp1 /Dsnprintf=_snprintf /c
-COPTS = /nologo /O2 /MD /Dsnprintf=_snprintf /c		# use /MT for static linking
+# use /Dsnprintf=_snprintf for older VSC++ versions which are not C99-compliant!
+#COPTS = /nologo /O2 /MT /Zp1 /Dsnprintf=_snprintf /c	# use /MT for static linking
+#COPTS = /nologo /O2 /MD /Dsnprintf=_snprintf /c
+COPTS = /nologo /O2 /MD /c
 COPTS = $(COPTS) /wd4996				# Disable warning regarding deprecated functions 
 							# ("use strcpy_s instead of strcpy" etc)
 COPTS = $(COPTS) $(WIN32_PLATFORMSDK_INCLUDE)

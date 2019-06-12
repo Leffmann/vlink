@@ -1,8 +1,8 @@
-/* $VER: vlink targets.c V0.16a (17.06.17)
+/* $VER: vlink targets.c V0.16c (10.03.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2019  Frank Wille
  */
 
 
@@ -19,6 +19,9 @@ struct FFFuncs *fff[] = {
 #endif
 #ifdef ATARI_TOS
   &fff_ataritos,
+#endif
+#ifdef XFILE
+  &fff_xfile,
 #endif
 #ifdef ELF32_PPC_BE
   &fff_elf32ppcbe,

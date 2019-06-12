@@ -1,8 +1,8 @@
-/* $VER: vlink config.h V0.15d (05.01.16)
+/* $VER: vlink config.h V0.16c (10.03.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2019  Frank Wille
  */
 
 #ifndef CONFIG_H
@@ -43,6 +43,7 @@
 #define ADOS                /* AmigaOS 68k hunk format */
 #define EHF                 /* WarpOS PPC extended hunk format */
 #define ATARI_TOS           /* Atari-ST TOS format */
+#define XFILE               /* Sharp X68000 Human68k XFile format */
 
 #define ELF32               /* general 32-bit ELF support */
 #define ELF32_PPC_BE        /* ELF PowerPC 32-Bit Big Endian */

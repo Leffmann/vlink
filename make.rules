@@ -7,7 +7,8 @@ vlinkobjects = $(DIR)/main.o $(DIR)/support.o $(DIR)/errors.o \
                $(DIR)/t_elf32i386.o $(DIR)/t_elf32arm.o \
                $(DIR)/t_elf32jag.o \
                $(DIR)/t_aout.o $(DIR)/t_aoutnull.o $(DIR)/t_aoutm68k.o \
-               $(DIR)/t_aouti386.o $(DIR)/t_aoutmint.o $(DIR)/t_ataritos.o \
+               $(DIR)/t_aouti386.o $(DIR)/t_aoutmint.o \
+               $(DIR)/t_ataritos.o $(DIR)/t_xfile.o \
                $(DIR)/t_rawbin.o $(DIR)/t_rawseg.o $(DIR)/t_vobj.o
 
 $(TARGET): $(DIR) $(vlinkobjects)
@@ -101,6 +102,9 @@ $(DIR)/t_aoutmint.o: t_aoutmint.c vlink.h config.h ar.h aout.h tosdefs.h aoutmin
 
 $(DIR)/t_ataritos.o: t_ataritos.c vlink.h config.h ar.h tosdefs.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_ataritos.c
+
+$(DIR)/t_xfile.o: t_xfile.c vlink.h config.h xfile.h
+	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_xfile.c
 
 $(DIR)/t_rawbin.o: t_rawbin.c vlink.h config.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_rawbin.c

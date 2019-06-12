@@ -1,8 +1,8 @@
-/* $VER: vlink t_amigahunk.c V0.16b (01.04.18)
+/* $VER: vlink t_amigahunk.c V0.16c (31.01.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2018  Frank Wille
+ * Copyright (c) 1997-2019  Frank Wille
  */
 
 
@@ -713,12 +713,13 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
       case HUNK_DATA:
       case HUNK_BSS:
         if (u && !s) {  /* a new Section */
-          uint32_t s_attr,s_size;
+          uint32_t s_attr,s_size,s_allocsize;
           nextword32(&hi);
 
           /* determine section's memory attributes */
           if (headerattr) {
             /* from an executable file */
+            s_allocsize = read32be(headerattr) & ~HUNKF_MEMTYPE;
             s_attr = (read32be(headerattr)>>29) & (MEMF_FAST|MEMF_CHIP);
             headerattr += 4;
             if (s_attr == (MEMF_FAST|MEMF_CHIP)) {
@@ -729,6 +730,7 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
           }
           else {
             /* from an object file */
+            s_allocsize = 0;
             s_attr = (w>>29) & (MEMF_FAST|MEMF_CHIP);
             if (s_attr == (MEMF_FAST|MEMF_CHIP))
               s_attr = nextword32(&hi);  /* @@@ this seems inofficial! */
@@ -759,9 +761,17 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
 
           /* create new section node */
           s_size = nextword32(&hi) & ~HUNKF_MEMTYPE;
-          s = create_section(u,secname,
-                             (w&0xffff)!=HUNK_BSS ? hi.hunkptr : NULL,
-                             (unsigned long)s_size<<2);
+          if (s_allocsize && (w&0xffff)!=HUNK_BSS) {
+            /* executable header defined a data-bss section */
+            uint8_t *databss = alloczero(s_allocsize << 2);
+            memcpy(databss,hi.hunkptr,s_size<<2);
+            s = create_section(u,secname,databss,(unsigned long)s_allocsize<<2);
+          }
+          else {
+            s = create_section(u,secname,
+                               (w&0xffff)!=HUNK_BSS ? hi.hunkptr : NULL,
+                               (unsigned long)s_size<<2);
+          }
           s->flags = SF_ALLOC;
           s->alignment = gv->min_alignment>2 ? gv->min_alignment : 2;
           if (sao = getsecattrovr(gv,secname,SAO_MEMFLAGS))

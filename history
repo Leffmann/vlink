@@ -12,7 +12,14 @@ vlink history
 (aoutmint):   changes are relevant for MiNT only
 (vobj):       changes for VOBJ format
 (tos):        changes for the Atari TOS format
+(xfile):      changes for the Sharp X68000 XFile format
 
+
+- 0.16c (10.06.19)
+o New target file format XFile, for Sharp X68000 computers. At the moment
+  only executables may be created. No object file support.
+o (ados/ehf) Handle data-bss sections correctly, when linking/stripping
+  executable files.
 
 - 0.16b (28.12.18)
 o New option -mtype: merge all sections of the same type (code, data,

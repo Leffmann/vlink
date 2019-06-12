@@ -1,13 +1,13 @@
-/* $VER: vlink version.c V0.16b (28.12.18)
+/* $VER: vlink version.c V0.16c (31.01.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2018  Frank Wille
+ * Copyright (c) 1997-2019  Frank Wille
  */
 
 
 /* version/revision */
-#define VERSION "0.16b"
+#define VERSION "0.16c"
 
 #define VERSION_C
 #include "vlink.h"
@@ -21,7 +21,7 @@ static const char *_ver = "$VER: " PNAME " " VERSION " " __AMIGADATE__ "\r\n";
 
 void show_version(void)
 {
-  printf(PNAME " V" VERSION " (c)1997-2018 by Frank Wille\n"
+  printf(PNAME " V" VERSION " (c)1997-2019 by Frank Wille\n"
          "build date: " __DATE__ ", " __TIME__ "\n\n");
 }
 

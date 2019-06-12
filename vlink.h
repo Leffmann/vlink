@@ -1,8 +1,8 @@
-/* $VER: vlink vlink.h V0.16b (29.12.17)
+/* $VER: vlink vlink.h V0.16c (10.03.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2019  Frank Wille
  */
 
 #include <stdlib.h>
@@ -962,6 +962,13 @@ extern struct FFFuncs fff_ehf;
 #ifndef T_ATARITOS_C
 #ifdef ATARI_TOS
 extern struct FFFuncs fff_ataritos;
+#endif
+#endif
+
+/* t_xfile.c */
+#ifndef T_XFILE_C
+#ifdef XFILE
+extern struct FFFuncs fff_xfile;
 #endif
 #endif
 
