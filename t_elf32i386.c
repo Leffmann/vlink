@@ -14,7 +14,7 @@
 #include "rel_elf386.h"
 
 
-static int i386_identify(char *,uint8_t *,unsigned long,bool);
+static int i386_identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void i386_readconv(struct GlobalVars *,struct LinkFile *);
 
 
@@ -27,6 +27,7 @@ static void i386_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32i386 = {
   "elf32i386",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -71,6 +72,7 @@ struct FFFuncs fff_elf32aros = {
   NULL,
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   i386_identify,
   i386_readconv,
@@ -107,7 +109,8 @@ static char linkerdb[] = "_LinkerDB";
 /*****************************************************************/
 
 
-static int i386_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int i386_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                         unsigned long plen,bool lib)
 /* identify ELF-386-32Bit-LittleEndian */
 {
   return elf_identify(&fff_elf32i386,name,p,plen,

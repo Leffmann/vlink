@@ -7,9 +7,10 @@ vlinkobjects = $(DIR)/main.o $(DIR)/support.o $(DIR)/errors.o \
                $(DIR)/t_elf32i386.o $(DIR)/t_elf32arm.o \
                $(DIR)/t_elf32jag.o \
                $(DIR)/t_aout.o $(DIR)/t_aoutnull.o $(DIR)/t_aoutm68k.o \
-               $(DIR)/t_aouti386.o $(DIR)/t_aoutmint.o \
+               $(DIR)/t_aouti386.o $(DIR)/tosopts.o $(DIR)/t_aoutmint.o \
                $(DIR)/t_ataritos.o $(DIR)/t_xfile.o $(DIR)/t_os9.o \
-               $(DIR)/t_rawbin.o $(DIR)/t_rawseg.o $(DIR)/t_vobj.o
+               $(DIR)/t_o65.o $(DIR)/t_rawbin.o $(DIR)/t_rawseg.o \
+               $(DIR)/t_vobj.o
 
 $(TARGET): $(DIR) $(vlinkobjects)
 	$(CC) $(CCOUT)$(DIR)/version.o $(COPTS) $(CONFIG) version.c
@@ -54,6 +55,9 @@ $(DIR)/ldscript.o: ldscript.c vlink.h config.h ldscript.h elfcommon.h
 
 $(DIR)/expr.o: expr.c vlink.h config.h ldscript.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) expr.c
+
+$(DIR)/tosopts.o: tosopts.c vlink.h config.h
+	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) tosopts.c
 
 $(DIR)/t_amigahunk.o: t_amigahunk.c vlink.h config.h ar.h amigahunks.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_amigahunk.c
@@ -108,6 +112,9 @@ $(DIR)/t_xfile.o: t_xfile.c vlink.h config.h xfile.h
 
 $(DIR)/t_os9.o: t_os9.c vlink.h config.h os9mod.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_os9.c
+
+$(DIR)/t_o65.o: t_o65.c vlink.h config.h o65.h
+	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_o65.c
 
 $(DIR)/t_rawbin.o: t_rawbin.c vlink.h config.h
 	$(CC) $(CCOUT)$@ $(COPTS) $(CONFIG) t_rawbin.c

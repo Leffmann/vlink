@@ -14,7 +14,7 @@
 #include "rel_elfarm.h"
 
 
-static int armle_identify(char *,uint8_t *,unsigned long,bool);
+static int armle_identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void armle_readconv(struct GlobalVars *,struct LinkFile *);
 static void armle_dyncreate(struct GlobalVars *);
 static void armle_writeobject(struct GlobalVars *,FILE *);
@@ -23,6 +23,7 @@ static void armle_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32armle = {
   "elf32armle",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -57,7 +58,8 @@ struct FFFuncs fff_elf32armle = {
 /*****************************************************************/
 
 
-static int armle_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int armle_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                          unsigned long plen,bool lib)
 /* identify ELF-ARM-32Bit-LittleEndian */
 {
   return (elf_identify(&fff_elf32armle,name,p,plen,

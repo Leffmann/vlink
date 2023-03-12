@@ -1,8 +1,8 @@
-/* $VER: vlink t_ataritos.c V0.15a (16.05.15)
+/* $VER: vlink t_ataritos.c V0.16h (16.01.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2015  Frank Wille
+ * Copyright (c) 1997-2015,2021  Frank Wille
  */
 
 #include "config.h"
@@ -12,7 +12,7 @@
 #include "tosdefs.h"
 
 
-static int identify(char *,uint8_t *,unsigned long,bool);
+static int identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void readconv(struct GlobalVars *,struct LinkFile *);
 static int targetlink(struct GlobalVars *,struct LinkedSection *,
                       struct Section *);
@@ -27,6 +27,7 @@ struct FFFuncs fff_ataritos = {
   defaultscript,
   NULL,
   NULL,
+  tos_options,
   headersize,
   identify,
   readconv,
@@ -57,7 +58,8 @@ struct FFFuncs fff_ataritos = {
 /*****************************************************************/
 
 
-static int identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                    unsigned long plen,bool lib)
 /* identify a TOS file */
 {
   return ID_UNKNOWN;  /* @@@ no read-support at the moment */
@@ -333,19 +335,21 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
   tos_header(f,sections[0] ? sections[0]->size+sections[0]->gapsize : 0,
              sections[1] ? sections[1]->size+sections[1]->gapsize : 0,
              sections[2] ? sections[2]->size : 0,
-             (unsigned long)nsyms*sizeof(struct DRIsym),gv->tosflags);
+             (unsigned long)nsyms*sizeof(struct DRIsym),tos_flags);
 
   for (i=0; i<3; i++)
     calc_relocs(gv,sections[i]);
 
   if (sections[0]) {
     fwritex(f,sections[0]->data,sections[0]->filesize);
-    fwritegap(f,(sections[0]->size-sections[0]->filesize)+sections[0]->gapsize);
+    fwritegap(gv,f,
+              (sections[0]->size-sections[0]->filesize)+sections[0]->gapsize);
   }
 
   if (sections[1]) {
     fwritex(f,sections[1]->data,sections[1]->filesize);
-    fwritegap(f,(sections[1]->size-sections[1]->filesize)+sections[1]->gapsize);
+    fwritegap(gv,f,
+              (sections[1]->size-sections[1]->filesize)+sections[1]->gapsize);
   }
 
   if (nsyms)

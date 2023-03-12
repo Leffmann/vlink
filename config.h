@@ -1,8 +1,8 @@
-/* $VER: vlink config.h V0.16f (26.07.20)
+/* $VER: vlink config.h V0.16h (28.01.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 #ifndef CONFIG_H
@@ -45,6 +45,7 @@
 #define ATARI_TOS           /* Atari-ST TOS format */
 #define XFILE               /* Sharp X68000 Human68k XFile format */
 #define OS_9                /* OS-9 6809 reentrant modules */
+#define O65                 /* o65 6502/65816 object/executable file format */
 
 #define ELF32               /* general 32-bit ELF support */
 #define ELF32_PPC_BE        /* ELF PowerPC 32-Bit Big Endian */
@@ -69,27 +70,29 @@
 #define AOUT_BSDI386        /* a.out NetBSD i386 (486,Pentium) 4k Pages */
 #define AOUT_PC386          /* a.out PC i386 (GNU MS-DOS?) */
 
-#define RAWBIN1             /* single raw binary file */
-#define RAWBIN2             /* multiple raw binary files */
 #define AMSDOS              /* Amstrad/Schneider CPC program */
 #define APPLEBIN            /* Apple DOS 3.3 binary file */
 #define ATARICOM            /* Atari DOS COM format */
+#define BBC                 /* BBC binary with info file */
 #define CBMPRG              /* Commodore PET, VIC-20, 64, etc. program */
 #define COCOML              /* Tandy Color Computer machine lang. file */
 #define DRAGONBIN           /* Dragon DOS binary format */
+#define IHEX                /* Intel Hex */
 #define JAGSRV              /* Jaguar Server (SkunkBoard, VirtualJaguar) */
+#define ORICMC              /* ORIC machine code file header */
+#define RAWBIN1             /* single raw binary file */
+#define RAWBIN2             /* multiple raw binary files */
+#define RAWSEG              /* multiple raw segment files */
+#define SINCQL              /* Sinclair QL, QDOS header or XTcc trailer */
+#define SHEX1               /* Customer specific hex format */
 #define SREC19              /* Motorola S-Record 16-bit addresses */
 #define SREC28              /* Motorola S-Record 24-bit addresses */
 #define SREC37              /* Motorola S-Record 32-bit addresses */
-#define IHEX                /* Intel Hex */
-#define SHEX1               /* Customer specific hex format */
-#define RAWSEG              /* multiple raw segment files */
-#define BBC                 /* BBC binary with info file */
 
 #define VOBJ                /* vasm special object format */
 
 /* dependencies */
-#ifdef AOUT_MINT
+#if defined(AOUT_MINT) && !defined(ATARI_TOS)
 #define ATARI_TOS           /* a.out-MiNT format needs TOS */
 #endif
 

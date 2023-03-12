@@ -1,8 +1,8 @@
-/* $VER: vlink t_os9.c V0.16g (18.10.20)
+/* $VER: vlink t_os9.c V0.16h (16.01.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 #include "config.h"
@@ -13,7 +13,8 @@
 
 
 static void init(struct GlobalVars *,int);
-static int identify(char *,uint8_t *,unsigned long,bool);
+static int options(struct GlobalVars *,int,const char **,int *);
+static int identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void readconv(struct GlobalVars *,struct LinkFile *);
 static int targetlink(struct GlobalVars *,struct LinkedSection *,
                       struct Section *);
@@ -28,6 +29,7 @@ struct FFFuncs fff_os9_6809 = {
   defaultscript,
   NULL,
   init,
+  options,
   hdrsize_6809,
   identify,
   readconv,
@@ -57,6 +59,11 @@ static const char modname_sym[] = "__modname";
 /* precalculated CRC table */
 static uint32_t *crctab;
 
+/* options */
+static bool os9noshare;              /* non-shareable module */
+static int os9mem,os9rev;            /* module header settings */
+static const char *os9name;          /* module name */
+
 
 static void init(struct GlobalVars *gv,int mode)
 /* create an artificial object containing the module name */
@@ -67,13 +74,13 @@ static void init(struct GlobalVars *gv,int mode)
   }
   else if (mode==FFINI_RESOLVE && gv->dest_name!=NULL &&
       findsymbol(gv,NULL,modname_sym,0)==NULL) {
-    size_t modnamelen = strlen(gv->os9name?gv->os9name:base_name(gv->dest_name));
+    size_t modnamelen = strlen(os9name?os9name:base_name(gv->dest_name));
     char *modname = alloc(modnamelen);
     struct ObjectUnit *ou;
     struct Section *sec;
 
     /* make module name from destination file name */
-    strncpy(modname,gv->os9name?gv->os9name:base_name(gv->dest_name),modnamelen);
+    strncpy(modname,os9name?os9name:base_name(gv->dest_name),modnamelen);
     modname[modnamelen-1] |= 0x80;  /* set bit 7 on last character */
 
     /* create artificial object with a __MODNAME section for the name */
@@ -92,13 +99,46 @@ static void init(struct GlobalVars *gv,int mode)
 }
 
 
+static int options(struct GlobalVars *gv,int argc,const char *argv[],int *i)
+{
+  if (!strncmp(argv[*i],"-os9-mem=",9)) {
+    int last = strlen(argv[*i]) - 1;
+    long mem;
+
+    sscanf(&argv[*i][9],"%li",&mem);
+    if (argv[*i][last]=='k' || argv[*i][last]=='K')
+      mem <<= 10;  /* value is in KBytes instead of Bytes */
+    os9mem = mem>256 ? mem : 256;
+  }
+  else if (!strncmp(argv[*i],"-os9-name=",10)) {
+    os9name = &argv[*i][10];
+  }
+  else if (!strcmp(argv[*i],"-os9-ns")) {
+    os9noshare = TRUE;
+  }
+  else if (!strncmp(argv[*i],"-os9-rev=",9)) {
+    long rev;
+
+    sscanf(&argv[*i][9],"%li",&rev);
+    if (rev<0 || rev>15)
+      error(130,argv[*i]);  /* bad assignment */
+    else
+      os9rev = rev;
+  }
+  else return 0;
+
+  return 1;
+}
+
+
 
 /*****************************************************************/
 /*                          Read OS9                             */
 /*****************************************************************/
 
 
-static int identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                    unsigned long plen,bool lib)
 /* identify an OS9 object or module */
 {
   return ID_UNKNOWN;  /* @@@ no read-support at the moment */
@@ -284,7 +324,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
   }
 
   entryoffs = entry_address(gv);
-  stk_size = gv->os9mem ? gv->os9mem : OS9_6809_DEFSTK;
+  stk_size = os9mem ? os9mem : OS9_6809_DEFSTK;
 
   /* determine size of initialized data */
   for (ls=(struct LinkedSection *)gv->lnksec.first, initdata_size=bss_size=0;
@@ -303,14 +343,12 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
     if (lma==0 && ls->copybase<sizeof(mh6809))
       error(137,(unsigned)ls->copybase,sizeof(6809));  /* not enough space */
     if (ls->copybase > lma)
-      fwritegap(f,ls->copybase-lma);
+      fwritegap(gv,f,ls->copybase-lma);
     lma = ls->copybase + ls->size;
 
     checkPIC(ls);
     calc_relocs(gv,ls);
-    fwritex(f,ls->data,ls->filesize);
-    if (ls->filesize < ls->size)
-      fwritegap(f,ls->size-ls->filesize);
+    fwritefullsect(gv,f,ls);
   }
 
   /* write size of initialized data */
@@ -327,7 +365,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
         error(136,ls->name);  /* executable section in data segment */
 
       if (ls->copybase > lma)
-        fwritegap(f,ls->copybase-lma);
+        fwritegap(gv,f,ls->copybase-lma);
       lma = ls->copybase + ls->size;
 
       /* move data-text and data-data relocations into their own list */
@@ -342,7 +380,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
                   (unsigned long long)rel->insert->mask,ls->name,rel->offset);
 
           remnode(&rel->n);
-          writesection(gv,ls->data+rel->offset,rel,
+          writesection(gv,ls->data,rel->offset,rel,
                        rel->relocsect.lnk->base+rel->addend);
           rel->offset += (lword)ls->base; /* offset relative to whole segment */
           if (rel->relocsect.lnk->type==ST_CODE) {
@@ -359,9 +397,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
 
       /* execute remaining relocs and write initialized data sections */
       calc_relocs(gv,ls);
-      fwritex(f,ls->data,ls->filesize);
-      if (ls->filesize < ls->size)
-        fwritegap(f,ls->size-ls->filesize);
+      fwritefullsect(gv,f,ls);
     }
   } while (ls = load_next_section(gv));
 
@@ -376,7 +412,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
   write16be(hdr.m_size,file_size+3);    /* including CRC, yet to be written */
   write16be(hdr.m_name,modname_address(gv,sizeof(mh6809)));
   hdr.m_tylan = 0x11;                    /* program module with 6809 code */
-  hdr.m_attrev = (gv->os9noshare?0:0x80) + (gv->os9rev&15);
+  hdr.m_attrev = (os9noshare?0:0x80) + (os9rev&15);
   hdr.m_parity = header_parity_check(&hdr,offsetof(mh6809,m_parity));
   write16be(hdr.m_exec,entryoffs);
   write16be(hdr.m_data,initdata_size+bss_size+stk_size);

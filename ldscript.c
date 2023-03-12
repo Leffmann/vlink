@@ -1,8 +1,8 @@
-/* $VER: vlink ldscript.c V0.16g (14.10.20)
+/* $VER: vlink ldscript.c V0.16h (03.09.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 
@@ -1827,7 +1827,8 @@ static struct Section *make_data_element(struct GlobalVars *gv)
     default: ierror("make_data_element"); break;
   }
 
-  sec = create_section(script_obj,name,data,datasize);
+  sec = create_section(script_obj,name,data,
+                       (datasize*8+gv->bits_per_tbyte-1)/gv->bits_per_tbyte);
   sec->type = ST_DATA;
   addtail(&script_obj->sections,&sec->n);
   return sec;

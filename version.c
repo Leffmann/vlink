@@ -1,13 +1,13 @@
-/* $VER: vlink version.c V0.16g (05.10.20)
+/* $VER: vlink version.c V0.16h (27.01.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 
 /* version/revision */
-#define VERSION "0.16g"
+#define VERSION "0.16h"
 
 #define VERSION_C
 #include "vlink.h"
@@ -16,13 +16,14 @@
 #ifdef AMIGAOS
 static const char *_ver = "$VER: " PNAME " " VERSION " " __AMIGADATE__ "\r\n";
 #endif
+const char *version_str = VERSION;
 
 
 
 void show_version(void)
 {
-  printf(PNAME " V" VERSION " (c)1997-2020 by Frank Wille\n"
-         "build date: " __DATE__ ", " __TIME__ "\n\n");
+  printf(PNAME " V%s (c)1997-2021 by Frank Wille\n"
+         "build date: " __DATE__ ", " __TIME__ "\n\n",version_str);
 }
 
 

@@ -14,7 +14,8 @@
 #include "rel_elfm68k.h"
 
 
-static int m68k_identify(char *,uint8_t *,unsigned long,bool);
+static int m68k_identify(struct GlobalVars *gv,char *,uint8_t *,
+                         unsigned long,bool);
 static void m68k_readconv(struct GlobalVars *,struct LinkFile *);
 static struct Symbol *m68k_dynentry(struct GlobalVars *,DynArg,int);
 static void m68k_dyncreate(struct GlobalVars *);
@@ -24,6 +25,7 @@ static void m68k_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32m68k = {
   "elf32m68k",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -58,7 +60,8 @@ struct FFFuncs fff_elf32m68k = {
 /*****************************************************************/
 
 
-static int m68k_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int m68k_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                         unsigned long plen,bool lib)
 /* identify ELF-M68k-32Bit-BigEndian */
 {
   return (elf_identify(&fff_elf32m68k,name,p,plen,

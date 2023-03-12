@@ -1,8 +1,8 @@
-/* $VER: vlink main.c V0.16g (05.10.20)
+/* $VER: vlink main.c V0.16h (14.04.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 
@@ -32,7 +32,7 @@ static const char *get_option_arg(int argc,const char *argv[],int *i)
 }
 
 
-static const char *get_arg(int argc,const char *argv[],int *i)
+const char *get_arg(int argc,const char *argv[],int *i)
 {
   if ((*i+1)<argc && *argv[*i+1]!='-')
     return argv[++*i];
@@ -41,8 +41,7 @@ static const char *get_arg(int argc,const char *argv[],int *i)
 }
 
 
-static lword get_assign_arg(int argc,const char *argv[],int *i,
-                            char *name,size_t len)
+lword get_assign_arg(int argc,const char *argv[],int *i,char *name,size_t len)
 {
   const char *p = get_arg(argc,argv,i);
   char *n = name;
@@ -140,68 +139,6 @@ static int flavours_cmp(const void *f1,const void *f2)
 }
 
 
-static int tos_options(struct GlobalVars *gv,int argc,const char *argv[],int i)
-{
-  /* -tos-options for targets ataritos and aoutmint */
-  if (!strcmp(&argv[i][5],"flags")) {
-    long fl;
-
-    sscanf(get_arg(argc,argv,&i),"%li",&fl);
-    gv->tosflags = fl;
-  }
-  else if (!strcmp(&argv[i][5],"fastload"))
-    gv->tosflags |= 1;
-  else if (!strcmp(&argv[i][5],"fastram"))
-    gv->tosflags |= 2;
-  else if (!strcmp(&argv[i][5],"fastalloc"))
-    gv->tosflags |= 4;
-  else if (!strcmp(&argv[i][5],"private"))
-    gv->tosflags &= ~0x30;
-  else if (!strcmp(&argv[i][5],"global"))
-    gv->tosflags |= 0x10;
-  else if (!strcmp(&argv[i][5],"super"))
-    gv->tosflags |= 0x20;
-  else if (!strcmp(&argv[i][5],"readable"))
-    gv->tosflags |= 0x30;
-  else if (!strcmp(&argv[i][5],"textbased"))
-    gv->textbasedsyms = 1;
-  else
-    error(2,argv[i]);  /* unrecognized option */
-  return i;
-}
-
-
-static int os9_options(struct GlobalVars *gv,int argc,const char *argv[],int i)
-{
-  /* OS-9 specific options */
-  if (!strncmp(&argv[i][5],"mem=",4)) {
-    int last = strlen(argv[i]) - 1;
-    long mem;
-
-    sscanf(&argv[i][9],"%li",&mem);
-    if (argv[i][last]=='k' || argv[i][last]=='K')
-      mem <<= 10;  /* value is in KBytes instead of Bytes */
-    gv->os9mem = mem>256 ? mem : 256;
-  }
-  else if (!strncmp(&argv[i][5],"name=",5)) {
-    gv->os9name = &argv[i][10];
-  }
-  else if (!strcmp(&argv[i][5],"ns")) {
-    gv->os9noshare = TRUE;
-  }
-  else if (!strncmp(&argv[i][5],"rev=",4)) {
-    long rev;
-
-    sscanf(&argv[i][9],"%li",&rev);
-    if (rev<0 || rev>15)
-      error(130,argv[i]);  /* bad assignment */
-    else
-      gv->os9rev = rev;
-  }
-  return i;
-}
-
-
 void cleanup(struct GlobalVars *gv)
 {
   exit(gv->returncode);
@@ -216,7 +153,7 @@ int main(int argc,const char *argv[])
   struct LibPath *libp;
   struct InputFile *ifn;
   bool stdlib = TRUE;
-  int so_version = 0;   /* minum version for shared objects */
+  int so_version = 0;   /* minimum version for shared objects */
   uint16_t flags = 0;   /* input file flags */
 
   /* initialize and set default values */
@@ -296,8 +233,7 @@ int main(int argc,const char *argv[])
         case 'c':
           if (!strncmp(&argv[i][2],"lr-",3))
             flags &= ~(chk_flags(argv[i]));   /* -clr-flags */
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'd':
@@ -305,8 +241,7 @@ int main(int argc,const char *argv[])
             gv->alloc_common = TRUE;  /* force alloc. of common syms. */
           else if (argv[i][2] == 'a')
             gv->alloc_addr = TRUE;  /* force alloc. of address syms. */
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'e':
@@ -345,38 +280,25 @@ int main(int argc,const char *argv[])
             gv->gc_sects = GCS_EMPTY;
           else if (!strcmp(&argv[i][2],"c-all"))
             gv->gc_sects = GCS_ALL;
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'h':
-          if (!strcmp(&argv[i][2],"unkattr")) {
-            struct SecAttrOvr *sao;
-            char secname[64];
-            lword val;
-
-            val = get_assign_arg(argc,argv,&i,secname,64);
-            sao = addsecattrovr(gv,secname,SAO_MEMFLAGS);
-            sao->memflags = (uint32_t)val;
+          if (!argv[i][2]) {
+            show_usage();      /* help text */
+            exit(EXIT_SUCCESS);
           }
-          else {
-            if (argv[i][2] == '\0') {
-              show_usage();      /* help text */
-              exit(EXIT_SUCCESS);
-            }
-            else
-              error(2,argv[i]);  /* unrecognized option */
-          }
+          else goto unknown;
           break;
 
         case 'i':
           if (!strcmp(&argv[i][2],"nterp"))
             gv->interp_path = get_arg(argc,argv,&i);
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'k':
+          if (argv[i][2]) goto unknown;
           gv->keep_sect_order = TRUE;
           break;
 
@@ -414,8 +336,7 @@ int main(int argc,const char *argv[])
             gv->merge_all = TRUE;
           else if (!strcmp(&argv[i][2],"ultibase"))
             gv->multibase = TRUE;
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'n':
@@ -423,8 +344,12 @@ int main(int argc,const char *argv[])
             gv->no_page_align = TRUE;
           else if (!strcmp(&argv[i][2],"ostdlib"))
             stdlib = FALSE;
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else if (!strncmp(&argv[i][2],"owarn=",6)){
+            int wno;
+            sscanf(argv[i]+8,"%i",&wno);
+            disable_warning(wno);
+          }
+          else goto unknown;
           break;
 
         case 'o':  /* set output file name */
@@ -435,13 +360,14 @@ int main(int argc,const char *argv[])
           }
           else if (!strcmp(&argv[i][2],"sec"))
             gv->output_sections = TRUE;  /* output each section as a file */
-          else if (!strncmp(&argv[i][2],"s9-",3))
-            i = os9_options(gv,argc,argv,i);
-          else
+          else if (strncmp(&argv[i][2],"s9-",3) &&
+                   strncmp(&argv[i][2],"65-",3))
             gv->dest_name = get_option_arg(argc,argv,&i);
+          else goto unknown;
           break;
 
         case 'q':  /* force relocations into final executable */
+          if (argv[i][2]) goto unknown;
           gv->keep_relocs = TRUE;
           break;
 
@@ -456,60 +382,33 @@ int main(int argc,const char *argv[])
               addtail(&gv->rpaths,&libp->n);
             }
           }
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 's':
-          switch (argv[i][2]) {
-            case '\0':  /* strip all symbols */
-              gv->strip_symbols = STRIP_ALL;
-              break;
-            case 'c':   /* -sc force small code */
-              gv->small_code = TRUE;
-              break;
-            case 'd':   /* -d force small data */
-              gv->small_data = TRUE;
-              break;
-            case 'e':
-              if (!strncmp(&argv[i][3],"t-",2))  /* -set-flags */
-                flags |= chk_flags(argv[i]);
-              else
-                error(2,argv[i]);  /* unrecognized option */
-              break;
-            case 'h':   /* -shared */
-              if (!strcmp(&argv[i][3],"ared"))
-                gv->dest_sharedobj = TRUE;
-              else
-                error(2,argv[i]);  /* unrecognized option */
-              break;
-            case 'o':   /* -soname <real name> */
-              if (!strcmp(&argv[i][3],"name"))
-                gv->soname = get_arg(argc,argv,&i);
-              else
-                error(2,argv[i]);  /* unrecognized option */
-              break;
-            case 't':   /* -static */
-              if (!strcmp(&argv[i][3],"atic"))
-                gv->dynamic = FALSE;
-              else
-                error(2,argv[i]);  /* unrecognized option */
-              break;
-            default:
-              error(2,argv[i]);  /* unrecognized option */
-              break;
-          }
+          if (!argv[i][2])                         /* -s strip all symbols */
+            gv->strip_symbols = STRIP_ALL;
+          else if (!strncmp(&argv[i][2],"et-",3))  /* -set-flags */
+            flags |= chk_flags(argv[i]);
+          else if (!strcmp(&argv[i][2],"c"))       /* -sc force small code */
+            gv->small_code = TRUE;
+          else if (!strcmp(&argv[i][2],"d"))       /* -sd force small data */
+            gv->small_data = TRUE;
+          else if (!strcmp(&argv[i][2],"hared"))   /* -shared */
+            gv->dest_sharedobj = TRUE;
+          else if (!strcmp(&argv[i][2],"oname"))   /* -soname <real name> */
+            gv->soname = get_arg(argc,argv,&i);
+          else if (!strcmp(&argv[i][2],"tatic"))   /* -static */
+            gv->dynamic = FALSE;
+          else goto unknown;
           break;
 
         case 't':  /* trace file accesses */
           if (!strcmp(&argv[i][2],"extbaserel"))
             gv->textbaserel = TRUE;
-          else if (!strncmp(&argv[i][2],"os-",3))
-            i = tos_options(gv,argc,argv,i);
           else if (!argv[i][2])
             gv->trace_file = stderr;
-          else
-            error(2,argv[i]);  /* unrecognized option */
+          else goto unknown;
           break;
 
         case 'u':  /* mark symbol as undefined */
@@ -523,6 +422,7 @@ int main(int argc,const char *argv[])
             gv->vice_file = fopen(buf,"w");
           }
           else {
+            if (argv[i][2]) goto unknown;
             show_version();
             printf("Standard library path: "
 #ifdef LIBPATH
@@ -538,10 +438,12 @@ int main(int argc,const char *argv[])
           break;
 
         case 'w':  /* suppress warnings */
+          if (argv[i][2]) goto unknown;
           gv->dontwarn = TRUE;
           break;
 
         case 'x':  /* discard all local symbols */
+          if (argv[i][2]) goto unknown;
           gv->discard_local = DISLOC_ALL;
           break;
 
@@ -583,21 +485,16 @@ int main(int argc,const char *argv[])
 
         case 'C':  /* select con-/destructor type */
           if (buf = get_option_arg(argc,argv,&i)) {
-            if (!strcmp(buf,"rel")) {
+            if (!strcmp(buf,"rel"))
               gv->pcrel_ctors = TRUE;
-            }
-            else if (!strcmp(buf,"gnu")) {
+            else if (!strcmp(buf,"gnu"))
               gv->collect_ctors_type = CCDT_GNU;
-            }
-            else if (!strcmp(buf,"vbcc")) {
+            else if (!strcmp(buf,"vbcc"))
               gv->collect_ctors_type = CCDT_VBCC;
-            }
-            else if (!strcmp(buf,"vbccelf")) {
+            else if (!strcmp(buf,"vbccelf"))
               gv->collect_ctors_type = CCDT_VBCC_ELF;
-            }
-            else if (!strcmp(buf,"sasc")) {
+            else if (!strcmp(buf,"sasc"))
               gv->collect_ctors_type = CCDT_SASC;
-            }
             else  /* @@@ print error message */
               gv->collect_ctors_type = CCDT_NONE;
           }
@@ -630,8 +527,7 @@ int main(int argc,const char *argv[])
               gv->endianess = _LITTLE_ENDIAN_;
               break;
             default:
-              error(2,argv[i]);  /* unrecognized option */
-              break;
+              goto unknown;
           }
           break;
 
@@ -681,6 +577,7 @@ int main(int argc,const char *argv[])
           break;
 
         case 'S':  /* strip debugger symbols */
+          if (argv[i][2]) goto unknown;
           gv->strip_symbols = STRIP_DEBUG;
           break;
 
@@ -709,14 +606,20 @@ int main(int argc,const char *argv[])
           break;
 
         case 'X':  /* discard temporary local symbols only */
+          if (argv[i][2]) goto unknown;
           gv->discard_local = DISLOC_TMP;
           break;
 
         case 'Z':  /* keep trailing zero-bytes at end of section */
+          if (argv[i][2]) goto unknown;
           gv->keep_trailing_zeros = TRUE;
           break;
 
         default:
+        unknown:
+          if (fff[gv->dest_format]->options)  /* target specific options */
+            if (fff[gv->dest_format]->options(gv,argc,argv,&i))
+              break;
           error(2,argv[i]);  /* unrecognized option */
           break;
       }

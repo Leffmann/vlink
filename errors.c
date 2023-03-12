@@ -1,8 +1,8 @@
-/* $VER: vlink errors.c V0.16g (29.12.20)
+/* $VER: vlink errors.c V0.16h (09.03.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 
@@ -15,6 +15,8 @@
 #define EF_WARNING 1
 #define EF_ERROR 2
 #define EF_FATAL 3
+#define EF_TYPEMASK 0xff
+#define EF_DISABLED (1<<8)
 
 
 static struct {
@@ -45,7 +47,8 @@ static struct {
   "%s: Unresolved reference to symbol %s in %s uses "               /* 20 */
     "unsupported type %d",EF_FATAL,
   "%s (%s+0x%x): Reference to undefined symbol %s",EF_ERROR,
-  "Attributes of section %s were changed from %s in %s to %s in %s",EF_WARNING,
+/* FIXME! "Attributes of section %s were changed from %s in %s to %s in %s",EF_WARNING,*/
+  "Attributes of section %s were changed from %s to %s in %s",EF_WARNING,
   "%s: %s expected",EF_FATAL,
   "%s (%s+0x%x): Illegal relative reference to %s+0x%llx",EF_ERROR, /* 24 */
   "%s (%s+0x%x): %dbit %s reference to %s+0x%llx (value to write: 0x%llx) "
@@ -195,8 +198,31 @@ static struct {
   "Executable section <%s> in data segment not allowed",EF_ERROR,
   "Not enough space for the module header (%u of %u)",EF_ERROR,
   "Target %s: multiple %s sections not allowed:<%s> and <%s>",EF_ERROR,
+  "%s: symbol index %u is out of range",EF_FATAL,
+  "%s: %s is chained",EF_WARNING,                                  /* 140 */
+  "Maximum file option size exceeded (%u)",EF_ERROR,
+  "%s: Ignoring weak symbol %s",EF_WARNING,
+  "%s: Unexpected relocations for section with index=%d",EF_FATAL,
+  "Bad error number: %d",EF_FATAL,
+  "Error number %d is not a warning",EF_FATAL,                     /* 145 */
+  "%s (%s): alternating bits per byte in object files (from %d to %d)",EF_FATAL,
+  "%s (%s): alternating bytes per address in object files (from %d to %d)",EF_FATAL,
+  "Endianess is unknown. Default to host endianess.",EF_WARNING,
+  "Mismatching target address sizes in input/output formats",EF_FATAL,
 };
 
+
+void disable_warning(int errn)
+{
+  if (errn<0 || errn>=sizeof(errors)/sizeof(errors[0])) {
+    error(144,errn);
+    return;
+  }
+  if ((errors[errn].flags & EF_TYPEMASK) == EF_WARNING)
+    errors[errn].flags |= EF_DISABLED;
+  else
+    error(145,errn);
+}
 
 
 void ierror(char *errtxt,...)
@@ -221,9 +247,10 @@ void error(int errn,...)
   struct GlobalVars *gv = &gvars;
   va_list vl;
   char *errtype;
-  int flags = errors[errn].flags;
+  int flags = errors[errn].flags & EF_TYPEMASK;
 
-  if ((flags == EF_WARNING) && gv->dontwarn)
+  if ((flags == EF_WARNING) &&
+      (gv->dontwarn || (errors[errn].flags & EF_DISABLED)))
     return;
   switch(flags) {
     case EF_WARNING:

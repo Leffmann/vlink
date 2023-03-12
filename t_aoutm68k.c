@@ -93,11 +93,13 @@ static const char zmagic_exe2[] = {
 
 
 #ifdef AOUT_BSDM68K
-static int aoutbsd68k_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutbsd68k_identify(struct GlobalVars *,char *,uint8_t *,
+                               unsigned long,bool);
 
 struct FFFuncs fff_aoutbsd68k = {
   "aoutbsd68k",
   zmagic_exe2,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -125,11 +127,13 @@ struct FFFuncs fff_aoutbsd68k = {
 #endif
 
 #ifdef AOUT_BSDM68K4K
-static int aoutbsd68k4k_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutbsd68k4k_identify(struct GlobalVars *,char *,uint8_t *,
+                                 unsigned long,bool);
 
 struct FFFuncs fff_aoutbsd68k4k = {
   "aoutbsd68k4k",
   zmagic_exe1,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -157,11 +161,13 @@ struct FFFuncs fff_aoutbsd68k4k = {
 #endif
 
 #ifdef AOUT_SUN010
-static int aoutsun010_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutsun010_identify(struct GlobalVars *,char *,uint8_t *,
+                               unsigned long,bool);
 
 struct FFFuncs fff_aoutsun010 = {
   "aoutsun010",
   zmagic_exe2,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -189,11 +195,13 @@ struct FFFuncs fff_aoutsun010 = {
 #endif
 
 #ifdef AOUT_SUN020
-static int aoutsun020_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutsun020_identify(struct GlobalVars *gv,char *,uint8_t *,
+                               unsigned long,bool);
 
 struct FFFuncs fff_aoutsun020 = {
   "aoutsun020",
   zmagic_exe2,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -251,11 +259,13 @@ static const char jaguar_exe[] = {
   "}\n"
 };
 
-static int aoutjaguar_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutjaguar_identify(struct GlobalVars *,char *,uint8_t *,
+                               unsigned long,bool);
 
 struct FFFuncs fff_aoutjaguar = {
   "aoutjaguar",
   jaguar_exe,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -284,7 +294,8 @@ struct FFFuncs fff_aoutjaguar = {
 
 
 #ifdef AOUT_BSDM68K
-static int aoutbsd68k_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutbsd68k_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                               unsigned long plen,bool lib)
 {
   return aout_identify(&fff_aoutbsd68k,name,(struct aout_hdr *)p,plen);
 }
@@ -292,7 +303,8 @@ static int aoutbsd68k_identify(char *name,uint8_t *p,unsigned long plen,bool lib
 
 
 #ifdef AOUT_BSDM68K4K
-static int aoutbsd68k4k_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutbsd68k4k_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                                 unsigned long plen,bool lib)
 {
   return aout_identify(&fff_aoutbsd68k4k,name,(struct aout_hdr *)p,plen);
 }
@@ -300,7 +312,8 @@ static int aoutbsd68k4k_identify(char *name,uint8_t *p,unsigned long plen,bool l
 
 
 #ifdef AOUT_SUN010
-static int aoutsun010_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutsun010_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                               unsigned long plen,bool lib)
 {
   return aout_identify(&fff_aoutsun010,name,(struct aout_hdr *)p,plen);
 }
@@ -308,7 +321,8 @@ static int aoutsun010_identify(char *name,uint8_t *p,unsigned long plen,bool lib
 
 
 #ifdef AOUT_SUN020
-static int aoutsun020_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutsun020_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                               unsigned long plen,bool lib)
 {
   return aout_identify(&fff_aoutsun020,name,(struct aout_hdr *)p,plen);
 }
@@ -316,7 +330,8 @@ static int aoutsun020_identify(char *name,uint8_t *p,unsigned long plen,bool lib
 
 
 #ifdef AOUT_JAGUAR
-static int aoutjaguar_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutjaguar_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                               unsigned long plen,bool lib)
 {
   return ID_UNKNOWN;  /* object are read as aoutnull */
 }

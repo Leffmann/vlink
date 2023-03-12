@@ -269,7 +269,7 @@ static void elf64_reloc(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
     if (is_rela)
       a = (lword)read64(be,elfrel->r_addend);
     else
-      a = readsection(gv,rtype,sec->data+offs,&ri);
+      a = readsection(gv,rtype,sec->data,offs,&ri);
 
     if (shndx == SHN_UNDEF || shndx == SHN_COMMON ||
         ELF64_ST_BIND(*sym->st_info) == STB_WEAK) {
@@ -303,7 +303,7 @@ static void elf64_reloc(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
 
     /* make sure that section data reflects this addend for other formats */
     if (is_rela)
-      writesection(gv,sec->data+offs,r,a);
+      writesection(gv,sec->data,offs,r,a);
   }
 }
 
@@ -877,7 +877,7 @@ static void elf64_writephdrs(struct GlobalVars *gv,FILE *f)
         gapsize += sizeof(struct Elf64_Phdr);
     }
   }
-  fwritegap(f,gapsize);  /* gap at the end, for unused PHDRs */
+  fwritegap(gv,f,gapsize);  /* gap at the end, for unused PHDRs */
 }
 
 
@@ -1133,10 +1133,10 @@ static size_t elf64_putdynreloc(struct GlobalVars *gv,struct LinkedSection *ls,
 
   if (rela) {
     write64(be,rp->r_addend,rel->addend);
-    writesection(gv,ls->data+rel->offset,rel,0);
+    writesection(gv,ls->data,rel->offset,rel,0);
     return sizeof(struct Elf64_Rela);
   }
-  writesection(gv,ls->data+rel->offset,rel,rel->addend);
+  writesection(gv,ls->data,rel->offset,rel,rel->addend);
   return sizeof(struct Elf64_Rel);
 }
 
@@ -1424,11 +1424,11 @@ void elf64_writeobject(struct GlobalVars *gv,FILE *f,uint16_t m,int8_t endian,
   elf_writesections(gv,f);
   /*@@@ elf64_writestabstr(f);*/
   elf_writestrtab(f,&elfshstrlist);
-  fwrite_align(f,2,ftell(f));
+  fwrite_align(gv,f,2,ftell(f));
   elf64_writeshdrs(gv,f,elfoffset,stabndx);
   elf_writesymtab(f,&elfsymlist);
   elf_writestrtab(f,&elfstringlist);
-  fwrite_align(f,2,ftell(f));
+  fwrite_align(gv,f,2,ftell(f));
   elf_writerelocs(f,reloclist);
 }
 
@@ -1476,12 +1476,12 @@ void elf64_writeexec(struct GlobalVars *gv,FILE *f,uint16_t m,int8_t endian,
   elf_writesegments(gv,f);
   /*@@@ elf64_writestabstr(f);*/
   elf_writestrtab(f,&elfshstrlist);
-  fwrite_align(f,2,ftell(f));
+  fwrite_align(gv,f,2,ftell(f));
   elf64_writeshdrs(gv,f,elfoffset,stabndx);
   elf_writesymtab(f,&elfsymlist);
   elf_writestrtab(f,&elfstringlist);
   if (gv->keep_relocs) {
-    fwrite_align(f,2,ftell(f));
+    fwrite_align(gv,f,2,ftell(f));
     elf_writerelocs(f,reloclist);
   }
 }

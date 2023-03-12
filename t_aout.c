@@ -468,7 +468,7 @@ static void aout_newreloc(struct GlobalVars *gv,struct aout_hdr *hdr,
   else
     initRelocInsert(&ri,0,size,-1);
 
-  a = readsection(gv,rtype,sec->data+offs,&ri);
+  a = readsection(gv,rtype,sec->data,offs,&ri);
 
   if (xtern) {
     /* relocation by an external reference to an unknown symbol */
@@ -1066,7 +1066,7 @@ uint32_t aout_addrelocs(struct GlobalVars *gv,struct LinkedSection **ls,
         a = (lword)ls[rsec]->base + rel->addend;
       /* @@@ calculation for other relocs: baserel,jmptab,load-relative? */
 
-      writesection(gv,ls[sec]->data+rel->offset,rel,a);
+      writesection(gv,ls[sec]->data,rel->offset,rel,a);
 
       if ((rinfo = getrinfo(gv,rel,FALSE,ls[sec]->name,rel->offset)) != ~0) {
         aout_addreloclist(rlst,rel->offset,(uint32_t)sectype[rsec],rinfo,be);
@@ -1091,7 +1091,7 @@ uint32_t aout_addrelocs(struct GlobalVars *gv,struct LinkedSection **ls,
         a = rel->addend;
       /* @@@ calculation for other relocs: baserel,jmptab,load-relative? */
 
-      writesection(gv,ls[sec]->data+rel->offset,rel,a);
+      writesection(gv,ls[sec]->data,rel->offset,rel,a);
 
       if ((rinfo = getrinfo(gv,rel,TRUE,ls[sec]->name,rel->offset)) != ~0) {
         aout_addreloclist(rlst,rel->offset,symidx,rinfo,be);
@@ -1200,17 +1200,18 @@ void aout_pagedsection(struct GlobalVars *gv,FILE *f,
 {
   if (ls[sec]) {
     fwritex(f,ls[sec]->data,ls[sec]->size);
-    fwritegap(f,aout_getpagedsize(gv,ls,sec) -
+    fwritegap(gv,f,aout_getpagedsize(gv,ls,sec) -
               (sec ? ls[sec]->size : ls[sec]->size+sizeof(struct aout_hdr)));
   }
 }
 
 
-void aout_writesection(FILE *f,struct LinkedSection *ls,uint8_t alignment)
+void aout_writesection(struct GlobalVars *gv,FILE *f,
+                       struct LinkedSection *ls,uint8_t alignment)
 {
   if (ls) {
     fwritex(f,ls->data,ls->size);
-    fwrite_align(f,alignment,ls->size);
+    fwrite_align(gv,f,alignment,ls->size);
   }
 }
 
@@ -1339,8 +1340,8 @@ void aoutstd_writeobject(struct GlobalVars *gv,FILE *f)
               sections[2] ? sections[2]->size : 0,
               aoutsymlist.nextindex * sizeof(struct nlist32),
               0,trsize,drsize,be);
-  aout_writesection(f,sections[0],(uint8_t)a);
-  aout_writesection(f,sections[1],(uint8_t)a);
+  aout_writesection(gv,f,sections[0],(uint8_t)a);
+  aout_writesection(gv,f,sections[1],(uint8_t)a);
   aout_writerelocs(f,&treloclist);
   aout_writerelocs(f,&dreloclist);
   aout_writesymbols(f);

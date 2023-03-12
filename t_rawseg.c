@@ -1,8 +1,8 @@
-/* $VER: vlink t_rawseg.c V0.16g (29.12.20)
+/* $VER: vlink t_rawseg.c V0.16h (10.03.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 
@@ -21,7 +21,8 @@ struct SegReloc {
 
 
 static unsigned long rawseg_headersize(struct GlobalVars *);
-static int rawseg_identify(char *,uint8_t *,unsigned long,bool);
+static int rawseg_identify(struct GlobalVars *,char *,uint8_t *,
+                           unsigned long,bool);
 static void rawseg_readconv(struct GlobalVars *,struct LinkFile *);
 static int rawseg_targetlink(struct GlobalVars *,struct LinkedSection *,
                               struct Section *);
@@ -45,6 +46,7 @@ static const char defaultscript[] =
 struct FFFuncs fff_rawseg = {
   "rawseg",
   defaultscript,
+  NULL,
   NULL,
   NULL,
   rawseg_headersize,
@@ -82,7 +84,8 @@ static unsigned long rawseg_headersize(struct GlobalVars *gv)
 }
 
 
-static int rawseg_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int rawseg_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                           unsigned long plen,bool lib)
 /* identify a binary file */
 {
   return ID_UNKNOWN;  /* binaries are only allowed to be written! */
@@ -182,6 +185,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                          r->offset,(unsigned long long)r->addend);
               }
               relsec = r->relocsect.lnk;
+              /* @@@ Check for SF_ALLOC? Shouldn't matter here. */
 
               /* find out to which segment relsec belongs */
               for (relph=gv->phdrlist; relph; relph=relph->next) {
@@ -189,8 +193,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                     relph->start!=ADDR_NONE && relph->start_vma!=ADDR_NONE) {
                   if (relsec->copybase>=(unsigned long)relph->start &&
                       (relsec->copybase+relsec->size)<=
-                      (unsigned long)relph->mem_end &&
-                      (relsec->flags & SF_ALLOC))
+                      (unsigned long)relph->mem_end)
                     break;
                 }
               }
@@ -200,7 +203,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                 struct SegReloc *newsr,*srp;
 
                 segoffs = (lword)relsec->copybase - relph->start;
-                v = writesection(gv,ls->data+r->offset,r,r->addend+segoffs);
+                v = writesection(gv,ls->data,r->offset,r,r->addend+segoffs);
                 if (v != 0) {
                   /* Calculated value doesn't fit into relocation type x ... */
                   if (ri = r->insert) {
@@ -258,14 +261,14 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
           if (!firstsec) {
             /* write an alignment gap, when needed */
             if (ls->copybase > addr)
-              fwritegap(segf,ls->copybase-addr);
+              fwritegap(gv,segf,ls->copybase-addr);
             else if (ls->copybase < addr)
               error(98,fff[gv->dest_format]->tname,ls->name,prevls->name);
           }
           else
             firstsec = FALSE;
 
-          fwritex(segf,ls->data,ls->size);
+          fwritex(segf,ls->data,tbytes(gv,ls->size));
 
           addr = ls->copybase + ls->size;
           prevls = ls;

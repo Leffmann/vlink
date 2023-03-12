@@ -1354,7 +1354,7 @@ size_t elf_addrela(struct GlobalVars *gv,struct LinkedSection *ls,
   }
 
   elf_addrelocnode(reloclist,ls->base+rel->offset,rel->addend,symidx,rtype,be);
-  writesection(gv,ls->data+rel->offset,rel,
+  writesection(gv,ls->data,rel->offset,rel,
                gv->reloctab_format==RTAB_ADDEND ? 0 : rel->addend);
   return reloclist->writesize;
 }
@@ -1413,7 +1413,7 @@ void elf_writesegments(struct GlobalVars *gv,FILE *f)
     if (p->type==PT_LOAD && (p->flags&PHDR_USED) &&
         p->start!=ADDR_NONE && p->start_vma!=ADDR_NONE) {
       /* write page-alignment gap */
-      fwritegap(f,p->alignment_gap);
+      fwritegap(gv,f,p->alignment_gap);
 
       /* write section contents */
       for (ls=(struct LinkedSection *)gv->lnksec.first;
@@ -1424,7 +1424,7 @@ void elf_writesegments(struct GlobalVars *gv,FILE *f)
           if (ls->filesize)
             fwritex(f,ls->data,ls->filesize);  /* section's contents */
           if (ls->gapsize)
-            fwritegap(f,ls->gapsize);  /* inter-section alignment gap */
+            fwritegap(gv,f,ls->gapsize);  /* inter-section alignment gap */
         }
       }
     }

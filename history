@@ -16,6 +16,33 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.16h (28.04.21)
+o Prepared the code to work with architectures which don't use 8-bit
+  bytes. Currently it should work with multiples of 8 bits.
+o New target file formats "o65-02" and "o65-816" can read and write
+  object files and executables in the o65 format by Andre Fachat.
+o New target file format "oricmc" writes a machine code file header
+  for Oric computers. Supports optional auto-exec (-autox).
+o New target file format "sinclairql" writes binary files for
+  Sinclair QL emulators using either a QDOS header or a XTcc trailer
+  and an optional reloc table.
+o New option -nowarn=n to not display a specific warning message.
+o Now the linker searches in all paths defined by -L first, before
+  finally looking into the local directly.
+o -Ttext <addr> may define the start address of absolute code even
+  without a linker script.
+o Some options are really target-specific now, and not available when
+  a different target is selected.
+o Fixed a rare bug when merging sections with the same type and linking
+  without a linker script.
+o Undefined symbols declared on the command line (-u) or in the linker
+  script (EXTERN) allocated 4 bytes at the end of the first section.
+  Fixed.
+o (vobj) Section attributes 'c' and 'x' both select type=code and set
+  the executable flag. Otherwise "rx" would be classified as data.
+o (rawseg) Fixed relocations to linker-script symbols in unallocated
+  sections.
+
 - 0.16g (31.12.20)
 o New target file format bbc to generate .inf files for BBC Micro/Master.
 o Fixed symbol assignments refering to other symbols in linker scripts.

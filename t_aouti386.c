@@ -53,11 +53,13 @@ static const char zmagic_exe[] = {
 
 
 #ifdef AOUT_BSDI386
-static int aoutbsdi386_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutbsdi386_identify(struct GlobalVars *,char *,uint8_t *,
+                                unsigned long,bool);
 
 struct FFFuncs fff_aoutbsdi386 = {
   "aoutbsdi386",
   zmagic_exe,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -85,11 +87,13 @@ struct FFFuncs fff_aoutbsdi386 = {
 #endif
 
 #ifdef AOUT_PC386
-static int aoutpc386_identify(char *,uint8_t *,unsigned long,bool);
+static int aoutpc386_identify(struct GlobalVars *,char *,uint8_t *,
+                              unsigned long,bool);
 
 struct FFFuncs fff_aoutpc386 = {
   "aoutpc386",
   zmagic_exe,
+  NULL,
   NULL,
   NULL,
   aout_headersize,
@@ -118,7 +122,8 @@ struct FFFuncs fff_aoutpc386 = {
 
 
 #ifdef AOUT_BSDI386
-static int aoutbsdi386_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutbsdi386_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                                unsigned long plen,bool lib)
 {
   return (aout_identify(&fff_aoutbsdi386,name,(struct aout_hdr *)p,plen));
 }
@@ -126,7 +131,7 @@ static int aoutbsdi386_identify(char *name,uint8_t *p,unsigned long plen,bool li
 
 
 #ifdef AOUT_PC386
-static int aoutpc386_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int aoutpc386_identify(struct GlobalVars *gv,char *name,uint8_t *p,unsigned long plen,bool lib)
 {
   return (aout_identify(&fff_aoutpc386,name,(struct aout_hdr *)p,plen));
 }

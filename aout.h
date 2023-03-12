@@ -176,7 +176,7 @@ void aout_header(FILE *,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,
                  uint32_t,uint32_t,uint32_t,uint32_t,int);
 uint32_t aout_getpagedsize(struct GlobalVars *,struct LinkedSection **,int);
 void aout_pagedsection(struct GlobalVars *,FILE *,struct LinkedSection **,int);
-void aout_writesection(FILE *,struct LinkedSection *,uint8_t);
+void aout_writesection(struct GlobalVars *gv,FILE *,struct LinkedSection *,uint8_t);
 void aout_writerelocs(FILE *,struct list *);
 void aout_writesymbols(FILE *);
 void aout_writestrings(FILE *,int);

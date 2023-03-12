@@ -14,7 +14,7 @@
 #include "rel_elfjag.h"
 
 
-static int jag_identify(char *,uint8_t *,unsigned long,bool);
+static int jag_identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void jag_readconv(struct GlobalVars *,struct LinkFile *);
 static void jag_writeobject(struct GlobalVars *,FILE *);
 static void jag_writeshared(struct GlobalVars *,FILE *);
@@ -22,6 +22,7 @@ static void jag_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32jag = {
   "elf32jag",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -54,7 +55,8 @@ struct FFFuncs fff_elf32jag = {
 /*****************************************************************/
 
 
-static int jag_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int jag_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                        unsigned long plen,bool lib)
 /* identify ELF-JaguarRISC-32Bit-BigEndian */
 {
   return (elf_identify(&fff_elf32jag,name,p,plen,

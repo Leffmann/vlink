@@ -1,8 +1,8 @@
-/* $VER: vlink vlink.h V0.16g (29.12.20)
+/* $VER: vlink vlink.h V0.16h (09.03.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 #include <stdlib.h>
@@ -511,10 +511,11 @@ struct GlobalVars {
   uint8_t gc_sects;             /* garbage-collect unreferenced sections */
   bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
   bool keep_sect_order;         /* keep order of section as found in objs */
+  uint8_t bits_per_tbyte;       /* bits per target byte (word) */
   uint8_t bits_per_taddr;       /* bits in target address (taddr, lword) */
+  uint8_t tbytes_per_taddr;     /* target bytes in a target address word */
   char masked_symbols;          /* symbols may use a feature-mask */
-  bool os9noshare;              /* OS9 non-shareable module */
-  char reserved[2];
+  char reserved[1];
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   FILE *vice_file;              /* label-file for the VICE emulator */
@@ -531,9 +532,6 @@ struct GlobalVars {
   const char *soname;           /* real name of shared object (-soname) */
   const char *interp_path;      /* path to program interpreter (ELF) */
   struct list rpaths;           /* library paths for dynamic linker (ELF) */
-  uint32_t tosflags;            /* flags field in TOS header */
-  int os9mem,os9rev;            /* OS9 module header settings */
-  const char *os9name;          /* OS9 module name */
 
   /* errors */
   bool dontwarn;                /* suppress warnings */
@@ -624,10 +622,12 @@ struct FFFuncs {                /* file format specific functions and data */
   const char *soldscript;       /* default linker-script for shared objects */
   void                          /* optional init function for the target */
     (*init)(struct GlobalVars *,int);
+  int                           /* file format specific options */
+    (*options)(struct GlobalVars *,int,const char **,int *);
   unsigned long                 /* size of header before first section */
     (*headersize)(struct GlobalVars *);
   int                           /* format identification */
-    (*identify)(char *,uint8_t *,unsigned long,bool);
+    (*identify)(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
   void                          /* read file and convert into internal fmt. */
     (*readconv)(struct GlobalVars *,struct LinkFile *);
   uint8_t                       /* compare target-specific section flags */
@@ -708,9 +708,10 @@ struct FFFuncs {                /* file format specific functions and data */
 #define FFF_DYN_RESOLVE_ALL 8   /* All dynamic symbol references have to */
                                 /* be resolved at link-time, even the */
                                 /* inter-DLL ones. */
-#define FFF_SECTOUT 16          /* Target allows to create a new file for */
+#define FFF_SECTOUT 0x10        /* Target allows to create a new file for */
                                 /* each section. */
-#define FFF_NOFILE 32           /* Target creates output files itself */
+#define FFF_NOFILE 0x20         /* Target creates output files itself */
+#define FFF_KEEPRELOCS 0x40     /* Binary target allows reloc table appended */
 
 
 /* List of artificially generated pointers or long words, which are */
@@ -731,112 +732,112 @@ struct PriPointer {
 /* main.c */
 #ifndef MAIN_C
 extern struct GlobalVars gvars;
-
-extern void cleanup(struct GlobalVars *);
 #endif
+const char *get_arg(int,const char **,int *);
+lword get_assign_arg(int,const char **,int *,char *,size_t);
+void cleanup(struct GlobalVars *);
 
 /* version.c */
 #ifndef VERSION_C
-extern void show_version(void);
-extern void show_usage(void);
+extern const char *version_str;
 #endif
+void show_version(void);
+void show_usage(void);
 
 /* support.c */
 #ifndef SUPPORT_C
 extern const char *endian_name[];
-
-extern void *alloc(size_t);
-extern void *re_alloc(void *,size_t);
-extern void *alloczero(size_t);
-extern const char *allocstring(const char *);
-extern void *alloc_hashtable(size_t);
-extern void memset16(struct GlobalVars *,void *,uint16_t,long);
-extern void initlist(struct list *);
-extern void insertbefore(struct node *,struct node *);
-extern void insertbehind(struct node *,struct node *);
-extern void addhead(struct list *,struct node *);
-extern void addtail(struct list *,struct node *);
-extern struct node *remhead(struct list *);
-extern struct node *remnode(struct node *);
-extern char *mapfile(const char *);
-extern const char *base_name(const char *);
-extern char *check_name(char *);
-extern bool checkrange(lword,bool,int);
-extern int8_t host_endianess(void);
-extern uint16_t swap16(uint16_t);
-extern uint32_t swap32(uint32_t);
-extern uint64_t swap64(uint64_t);
-extern uint16_t read16be(void *);
-extern uint32_t read32be(void *);
-extern uint64_t read64be(void *);
-extern void write16be(void *,uint16_t);
-extern void write32be(void *,uint32_t);
-extern void write64be(void *,uint64_t);
-extern uint16_t read16le(void *);
-extern uint32_t read32le(void *);
-extern uint64_t read64le(void *);
-extern void write16le(void *,uint16_t);
-extern void write32le(void *,uint32_t);
-extern void write64le(void *,uint64_t);
-extern uint16_t read16(bool,void *);
-extern uint32_t read32(bool,void *);
-extern uint64_t read64(bool,void *);
-extern void write16(bool,void *,uint16_t);
-extern void write32(bool,void *,uint32_t);
-extern void write64(bool,void *,uint64_t);
-extern int writetaddr(struct GlobalVars *,void *,lword);
-extern lword readbf(bool,void *,int,int,int);
-extern void writebf(bool,void *,int,int,int,lword);
-extern lword readreloc(bool,void *,int,int);
-extern void writereloc(bool,void *,int,int,lword);
-extern void fwritex(FILE *,const void *,size_t);
-extern void fwrite32be(FILE *,uint32_t);
-extern void fwrite16be(FILE *,uint16_t);
-extern void fwrite32le(FILE *,uint32_t);
-extern void fwrite16le(FILE *,uint16_t);
-extern void fwrite8(FILE *,uint8_t);
-extern void fwritetaddr(struct GlobalVars *,FILE *,lword);
-extern void fwrite_align(FILE *,uint32_t,uint32_t);
-extern void fwritegap(FILE *,long);
-extern unsigned long elf_hash(const char *);
-extern unsigned long align(unsigned long,unsigned long);
-extern unsigned long comalign(unsigned long,unsigned long);
-extern int shiftcnt(uint32_t);
-extern int lshiftcnt(lword);
-extern int highest_bit_set(lword);
-extern lword sign_extend(lword,int);
-void add_symnames(struct SymNames **,const char *,lword);
 #endif
+void *alloc(size_t);
+void *re_alloc(void *,size_t);
+void *alloczero(size_t);
+const char *allocstring(const char *);
+void *alloc_hashtable(size_t);
+void initlist(struct list *);
+void insertbefore(struct node *,struct node *);
+void insertbehind(struct node *,struct node *);
+void addhead(struct list *,struct node *);
+void addtail(struct list *,struct node *);
+struct node *remhead(struct list *);
+struct node *remnode(struct node *);
+int stricmp(const char *,const char *);
+char *mapfile(const char *);
+const char *base_name(const char *);
+char *check_name(char *);
+bool checkrange(lword,bool,int);
+int8_t host_endianess(void);
+uint16_t swap16(uint16_t);
+uint32_t swap32(uint32_t);
+uint64_t swap64(uint64_t);
+uint16_t read16be(void *);
+uint32_t read32be(void *);
+uint64_t read64be(void *);
+void write16be(void *,uint16_t);
+void write32be(void *,uint32_t);
+void write64be(void *,uint64_t);
+uint16_t read16le(void *);
+uint32_t read32le(void *);
+uint64_t read64le(void *);
+void write16le(void *,uint16_t);
+void write32le(void *,uint32_t);
+void write64le(void *,uint64_t);
+uint16_t read16(bool,void *);
+uint32_t read32(bool,void *);
+uint64_t read64(bool,void *);
+void write16(bool,void *,uint16_t);
+void write32(bool,void *,uint32_t);
+void write64(bool,void *,uint64_t);
+lword readbf(bool,void *,int,int,int);
+void writebf(bool,void *,int,int,int,lword);
+lword readreloc(bool,void *,int,int);
+void writereloc(bool,void *,int,int,lword);
+void fwritex(FILE *,const void *,size_t);
+void fwrite32be(FILE *,uint32_t);
+void fwrite16be(FILE *,uint16_t);
+void fwrite32le(FILE *,uint32_t);
+void fwrite16le(FILE *,uint16_t);
+void fwrite8(FILE *,uint8_t);
+void fwritetbyte(struct GlobalVars *,FILE *,lword);
+void fwritetaddr(struct GlobalVars *,FILE *,lword);
+void fwrite_align(struct GlobalVars *,FILE *,uint32_t,uint32_t);
+void fwritegap(struct GlobalVars *,FILE *,long);
+void fwritefullsect(struct GlobalVars *,FILE *,struct LinkedSection *);
+unsigned long elf_hash(const char *);
+unsigned long align(unsigned long,unsigned long);
+unsigned long comalign(unsigned long,unsigned long);
+int shiftcnt(uint32_t);
+int lshiftcnt(lword);
+int highest_bit_set(lword);
+lword sign_extend(lword,int);
+void add_symnames(struct SymNames **,const char *,lword);
+
 #define listempty(x) ((x)->first->next==NULL)
 #define makemask(x) ((lword)(1LL<<(x))-1)
 
 /* errors.c */
-#ifndef ERRORS_C
-extern void error(int,...);
-extern void ierror(char *,...);
-#endif
+void disable_warning(int);
+void error(int,...);
+void ierror(char *,...);
 
 /* linker.c */
-#ifndef LINKER_C
-extern void linker_init(struct GlobalVars *);
-extern void linker_load(struct GlobalVars *);
-extern void linker_resolve(struct GlobalVars *);
-extern void linker_relrefs(struct GlobalVars *);
-extern void linker_dynprep(struct GlobalVars *);
-extern void linker_sectrefs(struct GlobalVars *);
-extern void linker_gcsects(struct GlobalVars *);
-extern void linker_join(struct GlobalVars *);
-extern void linker_delunused(struct GlobalVars *);
-extern void linker_mapfile(struct GlobalVars *);
-extern void linker_copy(struct GlobalVars *);
-extern void linker_relocate(struct GlobalVars *);
-extern void linker_write(struct GlobalVars *);
-extern void linker_cleanup(struct GlobalVars *);
-extern const char *getobjname(struct ObjectUnit *);
-extern void print_function_name(struct Section *,unsigned long);
-extern void print_symbol(struct GlobalVars *,FILE *,struct Symbol *);
-extern bool trace_sym_access(struct GlobalVars *,const char *);
-#endif
+void linker_init(struct GlobalVars *);
+void linker_load(struct GlobalVars *);
+void linker_resolve(struct GlobalVars *);
+void linker_relrefs(struct GlobalVars *);
+void linker_dynprep(struct GlobalVars *);
+void linker_sectrefs(struct GlobalVars *);
+void linker_gcsects(struct GlobalVars *);
+void linker_join(struct GlobalVars *);
+void linker_delunused(struct GlobalVars *);
+void linker_mapfile(struct GlobalVars *);
+void linker_copy(struct GlobalVars *);
+void linker_relocate(struct GlobalVars *);
+void linker_write(struct GlobalVars *);
+void linker_cleanup(struct GlobalVars *);
+const char *getobjname(struct ObjectUnit *);
+void print_function_name(struct Section *,unsigned long);
+void print_symbol(struct GlobalVars *,FILE *,struct Symbol *);
+bool trace_sym_access(struct GlobalVars *,const char *);
 
 /* targets.c */
 #ifndef TARGETS_C
@@ -856,6 +857,7 @@ extern const char ctors_name[];
 extern const char dtors_name[];
 extern const char got_name[];
 extern const char plt_name[];
+extern const char zero_name[];
 extern const char sdabase_name[];
 extern const char sda2base_name[];
 extern const char gotbase_name[];
@@ -863,138 +865,137 @@ extern const char pltbase_name[];
 extern const char dynamic_name[];
 extern const char r13init_name[];
 extern const char noname[];
-extern bool check_protection(struct GlobalVars *,const char *);
-extern struct Symbol *findsymbol(struct GlobalVars *,struct Section *,
-                                 const char *,uint32_t);
-extern void hide_shlib_symbols(struct GlobalVars *);
-extern struct Symbol *addsymbol(struct GlobalVars *,struct Section *,
-                                const char *,const char *,lword,
-                                uint8_t,uint8_t,uint8_t,uint8_t,uint32_t,bool);
-extern struct Symbol *findlocsymbol(struct GlobalVars *,struct ObjectUnit *,
-                                    const char *);
-extern void addlocsymbol(struct GlobalVars *,struct Section *,char *,char *,
-                         lword,uint8_t,uint8_t,uint8_t,uint32_t);
-extern bool addglobsym(struct GlobalVars *,struct Symbol *);
-extern struct Symbol *addlnksymbol(struct GlobalVars *,const char *,lword,
-                                   uint8_t,uint8_t,uint8_t,uint8_t,uint32_t);
-extern struct Symbol *findlnksymbol(struct GlobalVars *,const char *);
-extern void fixlnksymbols(struct GlobalVars *,struct LinkedSection *);
-extern struct Symbol *find_any_symbol(struct GlobalVars *,
-                                      struct Section *,const char *);
-extern void reenter_global_objsyms(struct GlobalVars *,struct ObjectUnit *);
-extern struct Section *getinpsecoffs(struct LinkedSection *,unsigned long,
-                                     unsigned long *);
-extern struct RelocInsert *initRelocInsert(struct RelocInsert *,
-                                           uint16_t,uint16_t,lword);
-extern struct Reloc *newreloc(struct GlobalVars *,struct Section *,
-                              const char *,struct Section *,uint32_t,
-                              unsigned long,uint8_t,lword);
-extern void addreloc(struct Section *,struct Reloc *,uint16_t,uint16_t,lword);
-extern void addreloc_ri(struct Section *,struct Reloc *,struct RelocInsert *);
-extern bool isstdreloc(struct Reloc *,uint8_t,uint16_t);
-extern struct Reloc *findreloc(struct Section *,unsigned long);
-extern void addstabs(struct ObjectUnit *,struct Section *,char *,
-                     uint8_t,int8_t,int16_t,uint32_t);
-extern void fixstabs(struct ObjectUnit *);
-extern struct TargetExt *addtargetext(struct Section *,uint8_t,uint8_t,uint16_t,
-                                      uint32_t);
-extern bool checktargetext(struct LinkedSection *,uint8_t,uint8_t);
-extern lword readsection(struct GlobalVars *,uint8_t,uint8_t *,
-                         struct RelocInsert *);
-extern lword writesection(struct GlobalVars *,uint8_t *,struct Reloc *,lword);
-extern void calc_relocs(struct GlobalVars *,struct LinkedSection *);
-extern void sort_relocs(struct list *);
-extern struct Section *create_section(struct ObjectUnit *,const char *,
-                                      uint8_t *,unsigned long);
-extern struct Section *add_section(struct ObjectUnit *,const char *,
-                                   uint8_t *,unsigned long,uint8_t,uint8_t,
-                                   uint8_t,uint8_t,bool);
-extern bool is_common_sec(struct GlobalVars *,struct Section *);
-extern bool is_common_ls(struct GlobalVars *,struct LinkedSection *);
-extern struct Section *common_section(struct GlobalVars *,struct ObjectUnit *);
-extern struct Section *scommon_section(struct GlobalVars *,struct ObjectUnit *);
-extern struct Section *abs_section(struct ObjectUnit *);
-extern struct Section *dummy_section(struct GlobalVars *,struct ObjectUnit *);
-extern struct LinkedSection *create_lnksect(struct GlobalVars *,const char *,
-                                            uint8_t,uint8_t,uint8_t,uint8_t,
-                                            uint32_t);
-extern struct Section *find_sect_type(struct ObjectUnit *,uint8_t,uint8_t);
-extern struct Section *find_sect_id(struct ObjectUnit *,uint32_t);
-extern struct Section *find_sect_name(struct ObjectUnit *,const char *);
-extern struct Section *find_first_bss_sec(struct LinkedSection *);
-extern struct LinkedSection *find_lnksec(struct GlobalVars *,const char *,
-                                         uint8_t,uint8_t,uint8_t,uint8_t);
-extern struct LinkedSection *smalldata_section(struct GlobalVars *);
-extern void add_objunit(struct GlobalVars *,struct ObjectUnit *,bool);
-extern struct ObjectUnit *create_objunit(struct GlobalVars *,
-                                         struct LinkFile *,const char *);
-extern struct ObjectUnit *art_objunit(struct GlobalVars *,const char *,
-                                      uint8_t *,unsigned long);
-extern void collect_constructors(struct GlobalVars *);
-extern void add_priptrs(struct GlobalVars *,struct ObjectUnit *);
-extern void make_constructors(struct GlobalVars *);
-extern void get_text_data_bss(struct GlobalVars *,struct LinkedSection **);
-extern void text_data_bss_gaps(struct LinkedSection **);
-extern bool discard_symbol(struct GlobalVars *,struct Symbol *);
-extern lword entry_address(struct GlobalVars *gv);
-extern struct Section *entry_section(struct GlobalVars *);
-extern struct Symbol *bss_entry(struct GlobalVars *,struct ObjectUnit *,
-                                const char *,struct Symbol *);
-extern struct SecAttrOvr *addsecattrovr(struct GlobalVars *,char *,uint32_t);
-extern struct SecAttrOvr *getsecattrovr(struct GlobalVars *,const char *,
-                                        uint32_t);
-extern void addsecrename(const char *,const char *);
-extern struct SecRename *getsecrename(void);
-extern void trim_sections(struct GlobalVars *);
-extern void untrim_sections(struct GlobalVars *);
-extern struct LinkedSection *load_next_section(struct GlobalVars *);
 #endif
+size_t tbytes(struct GlobalVars *,size_t);
+void section_fill(struct GlobalVars *,uint8_t *,size_t,uint16_t,size_t);
+void section_copy(struct GlobalVars *,uint8_t *,size_t,uint8_t *,size_t);
+bool check_protection(struct GlobalVars *,const char *);
+struct Symbol *findsymbol(struct GlobalVars *,struct Section *,
+                          const char *,uint32_t);
+void hide_shlib_symbols(struct GlobalVars *);
+struct Symbol *addsymbol(struct GlobalVars *,struct Section *,
+                         const char *,const char *,lword,
+                         uint8_t,uint8_t,uint8_t,uint8_t,uint32_t,bool);
+struct Symbol *findlocsymbol(struct GlobalVars *,struct ObjectUnit *,
+                             const char *);
+void addlocsymbol(struct GlobalVars *,struct Section *,char *,char *,
+                  lword,uint8_t,uint8_t,uint8_t,uint32_t);
+bool addglobsym(struct GlobalVars *,struct Symbol *);
+struct Symbol *addlnksymbol(struct GlobalVars *,const char *,lword,
+                            uint8_t,uint8_t,uint8_t,uint8_t,uint32_t);
+struct Symbol *findlnksymbol(struct GlobalVars *,const char *);
+void fixlnksymbols(struct GlobalVars *,struct LinkedSection *);
+struct Symbol *find_any_symbol(struct GlobalVars *,
+                               struct Section *,const char *);
+void reenter_global_objsyms(struct GlobalVars *,struct ObjectUnit *);
+struct Section *getinpsecoffs(struct LinkedSection *,unsigned long,
+                              unsigned long *);
+struct RelocInsert *initRelocInsert(struct RelocInsert *,
+                                    uint16_t,uint16_t,lword);
+struct Reloc *newreloc(struct GlobalVars *,struct Section *,
+                       const char *,struct Section *,uint32_t,
+                       unsigned long,uint8_t,lword);
+void addreloc(struct Section *,struct Reloc *,uint16_t,uint16_t,lword);
+void addreloc_ri(struct Section *,struct Reloc *,struct RelocInsert *);
+bool isstdreloc(struct Reloc *,uint8_t,uint16_t);
+struct Reloc *findreloc(struct Section *,unsigned long);
+void addstabs(struct ObjectUnit *,struct Section *,char *,
+              uint8_t,int8_t,int16_t,uint32_t);
+void fixstabs(struct ObjectUnit *);
+struct TargetExt *addtargetext(struct Section *,uint8_t,uint8_t,uint16_t,
+                               uint32_t);
+bool checktargetext(struct LinkedSection *,uint8_t,uint8_t);
+lword readsection(struct GlobalVars *,uint8_t,uint8_t *,size_t,
+                  struct RelocInsert *);
+lword writesection(struct GlobalVars *,uint8_t *,size_t,struct Reloc *,lword);
+int writetaddr(struct GlobalVars *,void *,size_t,lword);
+void calc_relocs(struct GlobalVars *,struct LinkedSection *);
+void sort_relocs(struct list *);
+struct Section *create_section(struct ObjectUnit *,const char *,
+                               uint8_t *,unsigned long);
+struct Section *add_section(struct ObjectUnit *,const char *,uint8_t *,
+                            unsigned long,uint8_t,uint8_t,uint8_t,uint8_t,bool);
+bool is_common_sec(struct GlobalVars *,struct Section *);
+bool is_common_ls(struct GlobalVars *,struct LinkedSection *);
+struct Section *common_section(struct GlobalVars *,struct ObjectUnit *);
+struct Section *scommon_section(struct GlobalVars *,struct ObjectUnit *);
+struct Section *abs_section(struct ObjectUnit *);
+struct Section *dummy_section(struct GlobalVars *,struct ObjectUnit *);
+struct LinkedSection *create_lnksect(struct GlobalVars *,const char *,
+                                     uint8_t,uint8_t,uint8_t,uint8_t,uint32_t);
+struct Section *find_sect_type(struct ObjectUnit *,uint8_t,uint8_t);
+struct Section *find_sect_id(struct ObjectUnit *,uint32_t);
+struct Section *find_sect_name(struct ObjectUnit *,const char *);
+struct Section *find_first_bss_sec(struct LinkedSection *);
+struct LinkedSection *find_lnksec(struct GlobalVars *,const char *,
+                                  uint8_t,uint8_t,uint8_t,uint8_t);
+struct LinkedSection *smalldata_section(struct GlobalVars *);
+void add_objunit(struct GlobalVars *,struct ObjectUnit *,bool);
+struct ObjectUnit *create_objunit(struct GlobalVars *,
+                                  struct LinkFile *,const char *);
+struct ObjectUnit *art_objunit(struct GlobalVars *,const char *,
+                               uint8_t *,unsigned long);
+void collect_constructors(struct GlobalVars *);
+void add_priptrs(struct GlobalVars *,struct ObjectUnit *);
+void make_constructors(struct GlobalVars *);
+void get_text_data_bss(struct GlobalVars *,struct LinkedSection **);
+void text_data_bss_gaps(struct LinkedSection **);
+bool discard_symbol(struct GlobalVars *,struct Symbol *);
+lword entry_address(struct GlobalVars *gv);
+struct Section *entry_section(struct GlobalVars *);
+struct Symbol *bss_entry(struct GlobalVars *,struct ObjectUnit *,
+                         const char *,struct Symbol *);
+struct SecAttrOvr *addsecattrovr(struct GlobalVars *,char *,uint32_t);
+struct SecAttrOvr *getsecattrovr(struct GlobalVars *,const char *,uint32_t);
+void addsecrename(const char *,const char *);
+struct SecRename *getsecrename(void);
+void trim_sections(struct GlobalVars *);
+void untrim_sections(struct GlobalVars *);
+struct LinkedSection *load_next_section(struct GlobalVars *);
 
 /* dir.c */
-#ifndef DIR_C
-extern char *path_append(char *,const char *,const char *,size_t);
-extern char *open_dir(const char *);
-extern char *read_dir(char *);
-extern void close_dir(char *);
-extern void set_exec(const char *);
-#endif
+char *path_append(char *,const char *,const char *,size_t);
+char *open_dir(const char *);
+char *read_dir(char *);
+void close_dir(char *);
+void set_exec(const char *);
 
 /* ldscript.c */
-#ifndef LDSCRIPT_C
-extern bool is_ld_script(struct ObjectUnit *);
-extern void update_address(struct MemoryDescr *,struct MemoryDescr *,
-                           unsigned long);
-extern void align_address(struct MemoryDescr *,struct MemoryDescr *,
-                          unsigned long);
-extern void free_patterns(char *,char **);
-extern int test_pattern(struct GlobalVars *,char **,char ***);
-extern struct Section *next_pattern(struct GlobalVars *,char **,char ***);
-extern struct LinkedSection *next_secdef(struct GlobalVars *);
-extern void init_secdef_parse(struct GlobalVars *);
-extern void init_ld_script(struct GlobalVars *);
-#endif
+bool is_ld_script(struct ObjectUnit *);
+void update_address(struct MemoryDescr *,struct MemoryDescr *,unsigned long);
+void align_address(struct MemoryDescr *,struct MemoryDescr *,unsigned long);
+void free_patterns(char *,char **);
+int test_pattern(struct GlobalVars *,char **,char ***);
+struct Section *next_pattern(struct GlobalVars *,char **,char ***);
+struct LinkedSection *next_secdef(struct GlobalVars *);
+void init_secdef_parse(struct GlobalVars *);
+void init_ld_script(struct GlobalVars *);
 /* return value for valid file/section patterns from next_pattern() */
 #define VALIDPAT (struct Section *)1
 
 /* pmatch.c */
-#ifndef PMATCH_C
-extern bool pattern_match(const char *,const char *);
-extern bool patternlist_match(char **,const char *);
-#endif
+bool pattern_match(const char *,const char *);
+bool patternlist_match(char **,const char *);
 
 /* expr.c */
-#ifndef EXPR_C
-extern void skip(void);
-extern char getchr(void);
-extern int testchr(char);
-extern void skipblock(int,char,char);
-extern void back(int);
-extern char *gettxtptr(void);
-extern char *getarg(uint8_t);
-extern char *getquoted(void);
-extern int parse_expr(lword,lword *);
-extern int getlineno(void);
-extern void init_parser(struct GlobalVars *,const char *,const char *,int);
+void skip(void);
+char getchr(void);
+int testchr(char);
+void skipblock(int,char,char);
+void back(int);
+char *gettxtptr(void);
+char *getarg(uint8_t);
+char *getquoted(void);
+int parse_expr(lword,lword *);
+int getlineno(void);
+void init_parser(struct GlobalVars *,const char *,const char *,int);
+
+/* tosopts.c */
+#if defined(AOUT_MINT) || defined(ATARI_TOS)
+#ifndef T_TOSOPTS_C
+extern uint32_t tos_flags;
+#endif
+int tos_options(struct GlobalVars *,int,const char **,int *);
 #endif
 
 /* t_amigaos.c */
@@ -1023,6 +1024,14 @@ extern struct FFFuncs fff_xfile;
 #ifndef T_OS9_C
 #ifdef OS_9
 extern struct FFFuncs fff_os9_6809;
+#endif
+#endif
+
+/* t_o65.c */
+#ifndef T_OS65_C
+#ifdef O65
+extern struct FFFuncs fff_o6502;
+extern struct FFFuncs fff_o65816;
 #endif
 #endif
 
@@ -1136,6 +1145,9 @@ extern struct FFFuncs fff_applebin;
 #if defined(ATARICOM)
 extern struct FFFuncs fff_ataricom;
 #endif
+#if defined(BBC)
+extern struct FFFuncs fff_bbc;
+#endif
 #if defined(CBMPRG)
 extern struct FFFuncs fff_cbmprg;
 extern struct FFFuncs fff_cbmreu;
@@ -1146,11 +1158,14 @@ extern struct FFFuncs fff_cocoml;
 #if defined(DRAGONBIN)
 extern struct FFFuncs fff_dragonbin;
 #endif
+#if defined(ORICMC)
+extern struct FFFuncs fff_oricmc;
+#endif
 #if defined(JAGSRV)
 extern struct FFFuncs fff_jagsrv;
 #endif
-#if defined(BBC)
-extern struct FFFuncs fff_bbc;
+#if defined(SINCQL)
+extern struct FFFuncs fff_sincql;
 #endif
 #if defined(SREC19)
 extern struct FFFuncs fff_srec19;

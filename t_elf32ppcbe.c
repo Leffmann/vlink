@@ -15,7 +15,7 @@
 
 #define SBSS_MAXSIZE (4)  /* objects up to 4 bytes into .sbss */
 
-static int ppc32be_identify(char *,uint8_t *,unsigned long,bool);
+static int ppc32be_identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void ppc32be_readconv(struct GlobalVars *,struct LinkFile *);
 
 #if defined(ELF32_PPC_BE) || defined(ELF32_AMIGA)
@@ -27,6 +27,7 @@ static void ppc32be_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf32ppcbe = {
   "elf32ppcbe",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -71,6 +72,7 @@ struct FFFuncs fff_elf32powerup = {
   NULL,
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   ppc32be_identify,
   ppc32be_readconv,
@@ -99,6 +101,7 @@ struct FFFuncs fff_elf32morphos = {
   NULL,
   NULL,
   NULL,
+  NULL,
   elf32_headersize,
   ppc32be_identify,
   ppc32be_readconv,
@@ -124,6 +127,7 @@ struct FFFuncs fff_elf32morphos = {
 
 struct FFFuncs fff_elf32amigaos = {
   "elf32amigaos",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -176,7 +180,8 @@ static char ddrelocs_name[] = "ddrelocs";
 /*****************************************************************/
 
 
-static int ppc32be_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int ppc32be_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                            unsigned long plen,bool lib)
 /* identify ELF-PPC-32Bit-BigEndian */
 {
   int id;

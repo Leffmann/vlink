@@ -12,7 +12,7 @@
 #include "xfile.h"
 
 
-static int identify(char *,uint8_t *,unsigned long,bool);
+static int identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void readconv(struct GlobalVars *,struct LinkFile *);
 static int targetlink(struct GlobalVars *,struct LinkedSection *,
                       struct Section *);
@@ -25,6 +25,7 @@ static void writeexec(struct GlobalVars *,FILE *);
 struct FFFuncs fff_xfile = {
   "xfile",
   defaultscript,
+  NULL,
   NULL,
   NULL,
   headersize,
@@ -57,7 +58,8 @@ struct FFFuncs fff_xfile = {
 /*****************************************************************/
 
 
-static int identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                    unsigned long plen,bool lib)
 /* identify an XFile-format file */
 {
   return ID_UNKNOWN;  /* @@@ no read-support at the moment */
@@ -269,12 +271,14 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
 
   if (sections[0]) {
     fwritex(f,sections[0]->data,sections[0]->filesize);
-    fwritegap(f,(sections[0]->size-sections[0]->filesize)+sections[0]->gapsize);
+    fwritegap(gv,f,
+              (sections[0]->size-sections[0]->filesize)+sections[0]->gapsize);
   }
 
   if (sections[1]) {
     fwritex(f,sections[1]->data,sections[1]->filesize);
-    fwritegap(f,(sections[1]->size-sections[1]->filesize)+sections[1]->gapsize);
+    fwritegap(gv,f,
+              (sections[1]->size-sections[1]->filesize)+sections[1]->gapsize);
   }
 
   relocsz = xfile_writerelocs(gv,f,sections);

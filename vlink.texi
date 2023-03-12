@@ -12,7 +12,7 @@
 @ifinfo
 This is the manual for the portable multi-format linker vlink.
 
-Copyright 1997-2020 Frank Wille
+Copyright 1997-2021 Frank Wille
 @end ifinfo
 
 @titlepage
@@ -42,7 +42,7 @@ Empty sections and other unused data are deleted to achieve a size-optimized
 output.
 
 @section Legal
-    vlink is copyright 1995-2020 by Frank Wille.
+    vlink is copyright 1995-2021 by Frank Wille.
 
     This archive may be redistributed without modifications and used
     for non-commercial purposes.
@@ -98,7 +98,8 @@ Currently supported:
   @item aoutsun020 (SunOS 68020 and AmigaOS/Atari 68020-68060)
   @item aoutbsdi386 (NetBSD/i386)
   @item aoutpc386
-  @item aoutmint (Embeds a.out in TOS format for Atari MiNT executables)
+  @item aoutmint (Embeds a.out in TOS format for Atari MiNT executables,
+                  supports extra options like the @code{ataritos} format)
   @item aoutjaguar (M68k with special, word-swapped RISC relocations)
 @end itemize
 Small data offset: @code{0x8000} (unused).
@@ -142,8 +143,9 @@ references from other sections. This mode can be used to create
 reentrable, "pure" programs, for use with the AmigaOS @command{resident}
 command.
 
-Supports @option{-Rstd} and @option{-Rshort}. @option{-hunkattr} can be
-used to overwrite the memory flags of an input section.
+Supports @option{-Rstd} and @option{-Rshort}. The target-specific
+@option{-hunkattr} can be used to overwrite the memory flags of an input
+section.
 This format was called "amigaos" in former @command{vlink} versions.
 
 @item amigaehf
@@ -153,7 +155,8 @@ executables (they are in @code{amigahunk} format) or shared objects.
 The same linker symbols, constructors/destructors as under
 @code{amigahunk} are supported. Additionally, @code{@@_name} symbols will
 be created on demand (when referenced).
-Supports @option{-Rstd}, @option{-Rshort} and @option{-hunkattr}.
+Supports @option{-Rstd}, @option{-Rshort} and the target-specific
+@option{-hunkattr}.
 
 @item amsdos
 Absolute raw binary output, similar to rawbin2, but with a header
@@ -170,7 +173,10 @@ and section headers for Atari 8-bit computers (Atari 400, 600, 800, etc.).
 @item ataritos
 Atari-ST TOS file format. Executables only at the moment. Symbol table
 in extended DRI format. Symbols may be section- or start-based (option
-@option{-tos-textbased}).
+@option{-tos-textbased}). Additionally is supports the target-specific
+options: @option{-tos-flags}, @option{-tos-fastload},
+@option{-tos-fastram}, @option{-tos-fastalloc}, @option{-tos-private},
+@option{-tos-global}, @option{-tos-super}, @option{-tos-readable}.
 The internal linker script defines _LinkerDB for small
 data and supports @command{vbcc}-style
 constructor/destructor tables
@@ -209,7 +215,7 @@ function tables will be placed into the sections @code{.ctors}
 and @code{.dtors}. Supports @option{-Rstd} and @option{-Radd}.
 
 @item elf32aros
-ELF i386 32-bit little endian like elf32i386, but generates
+ELF i386 32-bit little endian like @code{elf32i386}, but generates
 relocatable object files as executables. This format is
 used for the AROS (Amiga Research OS) operating system.
 Supports @option{-Rstd} and @option{-Radd}.
@@ -241,7 +247,7 @@ Nearly identical to elf32powerup. Only difference is that
 loader will take care of it. This format is used for MorphOS.
 
 @item elf32powerup
-ELF PowerPC 32-bit big endian like elf32ppcbe, but generates
+ELF PowerPC 32-bit big endian like @code{elf32ppcbe}, but generates
 relocatable object files as executables. This format is
 used for the PowerUp kernel. The linker symbol @code{_LinkerDB} is
 defined for @command{vbccppc}-compatibility.
@@ -272,6 +278,30 @@ Absolute raw binary output, similar to rawbin1, but with a header to make
 it load and execute via the Atari Jaguar SkunkBoard or the VirtualJaguar
 emulator.
 
+@item o65-02
+The o65 binary relocation format for the 6502 family V1.3, as defined by
+Andre Fachat. Supports reading and writing object files and executables,
+which may be relocatable.
+The following target-specific options are supported: @option{-o65-align},
+@option{-o65-author}, @option{-o65-bsszero}, @option{-o65-cpu},
+@option{-o65-fopts}, @option{-o65-name}, @option{-o65-paged},
+@option{-o65-stack}.
+
+@item o65-816
+The o65 binary relocation format for 65816 processors V1.3, as defined by
+Andre Fachat. Supports reading and writing object files and executables,
+which may be relocatable.
+The following target-specific options are supported: @option{-o65-align},
+@option{-o65-author}, @option{-o65-bsszero},
+@option{-o65-fopts}, @option{-o65-name}, @option{-o65-paged},
+@option{-o65-stack}.
+
+@item oricmc
+Absolute raw binary output, similar to rawbin1, but with a header for
+machine code files, suitable for ORIC-1, Atmos, Telestrat and Pravetz
+computers.
+The following target-specific options are supported: @option{-autox}.
+
 @item os9-6809
 OS-9 program modules for the 6809 processor, as defined by Microware
 Systems Corporation and the NitrOS-9 project.
@@ -282,6 +312,8 @@ program's startup code. @command{vbcc}-style constructor/destructor tables
 will be created and placed into the data section. By default, the
 module name will be the same as the output file name.
 No support for symbol tables.
+Supports target-specific options: @option{-os9-mem}, @option{-os9-name},
+@option{-os9-ns}, @option{-os9-rev}.
 
 @item rawbin1
 Absolute raw binary file. The sections and base addresses
@@ -322,6 +354,14 @@ matches the target's address size. Note, that only simple address relocations
 with the full address size are supported (no halfwords, etc.), which makes
 it nearly useless for certain targets, like the 6502 or RISC CPUs.
 
+@item sinclairql
+Absolute raw binary output, similar to rawbin1, for the 68008-based
+Sinclair QL computer. Prepends a QDOS file header (default, @option{-qhdr}
+or an XTcc trailer (@option{-xtcc}). These headers are mostly used
+directly by emulators or for file transfer.
+The following target-specific options are supported: @option{-qhdr},
+@option{-xtcc}, @option{-stack=<n>}.
+
 @item srec19
 @itemx srec28
 @itemx srec37
@@ -348,29 +388,11 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 @end table
 
 @section Linker Options
-@command{vlink} command template:
-@example
-  @command{vlink [-dhmnqrstvwxMRSX] [-B linkmode] [-b targetname]
-  [-baseoff offset] [-C constructor-type] [-Crel] [-D symbol=value]
-  [-da] [-dc] [-dp] [-EB] [-EL] [-e entrypoint] [-export-dynamic]
-  [-f flavour] [-fixunnamed] [-F filename] [-gc-all] [-gc-empty]
-  [-hunkattr secname=value] [-interp path] [-L library-search-path]
-  [-l library-specifier] [-minalign val] [-mrel] [-mtype] [-mall]
-  [-multibase] [-nostdlib] [-N old new] [-o filename]
-  [-rpath path] [-sc] [-sd] [-shared] [-soname name] [-static]
-  [-T filename] [-Ttext addr] [-textbaserel]
-  [-tos-flags/fastload/fastram/private/global/super/readable]
-  [-tos-textbased] [-u symbol] [-vicelabels filename]
-  [-V version] [-y symbol] [-P symbol]
-  input-files...}
-@end example
-
 Usually options and input file names can be mixed. Order of options may be
 important (e.g. when specifying a library with @option{-l} or a search path
 with @option{-L}).
 
-The following options are supported:
-
+The following general options are supported:
 @table @option
 
 @item -Bdynamic
@@ -513,12 +535,6 @@ any case.
 @item -h
 Prints a short help text.
 
-@item -hunkattr secname=value
-Overwrite the memory attributes of all input sections named @code{secname}
-with @code{value}. For example allocate the @code{DATA} section in
-Chip-RAM: @code{-hunkattr DATA=2}. Extended memory attributes are supported.
-Only valid for AmigaDOS hunk format and WarpOS EHF.
-
 @item -interp interpreter-path
 Defines the name of the interpreter, which is usually the
 dynamic linker for dynamically linked ELF executables.
@@ -533,7 +549,8 @@ Has no meaning when using a linker script!
 @item -L library-search-path
 Add path to the list of directories to search for libraries
 specified with the @option{-l} option. When a default search path
-was compiled in (see @option{-v}), then it is searched last.
+was compiled in (see @option{-v}), then it is searched last, before
+finally looking into the local directory.
 
 @item -l library-specifier
 This option specifies a library to be considered for inclusion
@@ -599,6 +616,9 @@ executable (@code{NMAGIC}).
 @item -nostdlib
 Ignore default library search path, if one was compiled in.
 
+@item -nowarn=n
+Do not display warning number @code{n}. May occur multiple times.
+
 @item -o filename
 Specifies the name of the output file. Defaults to @file{a.out}.
 
@@ -610,27 +630,6 @@ rawbin1, rawbin2, amsdos, cbmprg.
 @item -osec=basename
 Works like @option{-osec}, but each output file name will be preceded
 by @file{"basename."}.
-
-@item -os9-mem=val[K]
-Defines the size of the stack and the parameter area, which the
-linker will add to the permanent storage size in the module header.
-The value given in @code{val} is in bytes. You may specify
-the value in K-bytes by appending a '@code{k}' character.
-The size of the stack and parameter area defaults to 1024 bytes for
-OS9/6809.
-
-@item -os9-name=modname
-Set the name of the OS-9 module to @code{modname}. Otherwise it defaults
-to the name of the output file or may be specified in the code, labeled
-by the symbol @code{__modname}.
-
-@item -os9-ns
-Declare the OS-9 module as non-shareable and non-reentrant. It resets
-the shareable-flag in the module header, which is set otherwise.
-
-@item -os9-rev=val
-Set the revision in the OS-9 module header to @code{val}. Must be a value
-beteen 0 and 15. Defaults to zero.
 
 @item -P symbol
 Protect a symbol from stripping. This doesn't work for all targets!
@@ -700,6 +699,8 @@ and there are a few additional commands. @xref{Linker Scripts}.
 @item -Ttext addr
 Set the base address of the first section. It can be overridden by
 a linker script.
+Without a linker script it either sets the start address of the first
+section or of any section, depending on the output format.
 
 @item -t
 Trace the linker's file accesses.
@@ -707,40 +708,6 @@ Trace the linker's file accesses.
 @item -textbaserel
 Allow base-relative access on code sections. Otherwise the
 linker will display a warning.
-
-@item -tos-flags value
-Set the 32 bit flags field of the Atari TOS header to @code{value}.
-All @option{-tos} options are only valid for the targets @code{ataritos} and
-@code{aoutmint}.
-
-@item -tos-fastload
-Sets the fastload bit (0) in the TOS header.
-
-@item -tos-fastram
-Sets the fastload bit (1) in the TOS header.
-
-@item -tos-fastalloc
-Sets the fastload bit (2) in the TOS header.
-
-@item -tos-private
-Sets the flags in the TOS header to mark memory space as private.
-
-@item -tos-global
-Sets the flags in the TOS header to mark memory space as global (read/write
-by any process).
-
-@item -tos-super
-Sets the flags in the TOS header to mark memory space as read-writeable by
-processes in supervisor mode only.
-
-@item -tos-readable
-Sets the flags in the TOS header to mark memory space as read-only for other
-processes.
-
-@item -tos-textbased
-Writes text-based (offset to program start) DRI symbols to a TOS executable,
-like Devpac. Otherwise symbol offsets are based on the section they are
-defined in.
 
 @item -u symbol
 Marks symbol as undefined in the first section which was
@@ -776,6 +743,146 @@ Do not delete trailing zero-bytes at the end of a section in executable
 output files. Usually the uninitialized part of a section is determined
 by the difference between the section's real size and file size (for
 those file formats which support it).
+@end table
+
+
+Target specific options @code{amigahunk}, @code{amigaehf}:
+@table @option
+
+@item -hunkattr secname=value
+Overwrite the memory attributes of all input sections named @code{secname}
+with @code{value}. For example allocate the @code{DATA} section in
+Chip-RAM: @code{-hunkattr DATA=2}. Extended memory attributes are supported.
+
+@end table
+
+Target specific options @code{aoutmint}, @code{ataritos}:
+@table @option
+
+@item -tos-flags value
+Set the 32 bit flags field of the Atari TOS header to @code{value}.
+
+@item -tos-fastload
+Sets the fastload bit (0) in the TOS header.
+
+@item -tos-fastram
+Sets the fastram bit (1) in the TOS header.
+
+@item -tos-fastalloc
+Sets the fastalloc bit (2) in the TOS header.
+
+@item -tos-private
+Sets the flags in the TOS header to mark memory space as private.
+
+@item -tos-global
+Sets the flags in the TOS header to mark memory space as global (read/write
+by any process).
+
+@item -tos-super
+Sets the flags in the TOS header to mark memory space as read-writeable by
+processes in supervisor mode only.
+
+@item -tos-readable
+Sets the flags in the TOS header to mark memory space as read-only for other
+processes.
+
+@item -tos-textbased
+Writes text-based (offset to program start) DRI symbols to a TOS executable,
+like Devpac does. Otherwise symbol offsets are based on the section they are
+defined in.
+
+@end table
+
+
+Target specific options @code{o65-02}, @code{o65-816}:
+@table @option
+
+@item -o65-align val
+Set minimum alignment for all sections as number of least significant bits
+which have to be zero. @code{val} may be 0, 1, 2, 8. Default behaviour is
+to use the maximum alignment given by the input sections.
+
+@item -o65-author name
+Store the given author name in the output.
+
+@item -o65-bsszero
+Set a flag in the header which requests automatic clearing of the
+@code{.bss} section.
+
+@item -o65-cpu cpumodel
+Defines that the executable uses the instruction set of the given
+6502-model @code{cpumodel}.
+Known models are: 6502, 65c02, 65sc02, 65ce02, nmos6502, 65816 (in 6502
+emulation mode). Option is not available for @code{o65-816}, which is
+native 65816.
+
+@item -o65-fopts
+Enable informational header options, generated by the linker: file name,
+linker name and version, creation date.
+
+@item -o65-name name
+Set the "name" header option to @code{name}. Overwrites the real name
+which would be written by @option{-o65-fopts}.
+
+@item -o65-paged
+Make the output file use paged alignment and simplified paged relocations.
+
+@item -o65-stack val
+Store required stack size as @code{val} to the header.
+
+@end table
+
+
+Target specific options @code{oricmc}:
+@table @option
+
+@item -autox
+Set the auto-execute flag in the header, so the program starts
+automatically after loading.
+
+@end table
+
+
+Target specific options @code{os9-6809}:
+@table @option
+
+@item -os9-mem=val[K]
+Defines the size of the stack and the parameter area, which the
+linker will add to the permanent storage size in the module header.
+The value given in @code{val} is in bytes. You may specify
+the value in K-bytes by appending a '@code{k}' character.
+The size of the stack and parameter area defaults to 1024 bytes for
+OS9/6809.
+
+@item -os9-name=modname
+Set the name of the OS-9 module to @code{modname}. Otherwise it defaults
+to the name of the output file or may be specified in the code, labeled
+by the symbol @code{__modname}.
+
+@item -os9-ns
+Declare the OS-9 module as non-shareable and non-reentrant. It resets
+the shareable-flag in the module header, which is set otherwise.
+
+@item -os9-rev=val
+Set the revision in the OS-9 module header to @code{val}. Must be a value
+beteen 0 and 15. Defaults to zero.
+
+@end table
+
+
+Target specific options @code{sinclairql}:
+@table @option
+
+@item -qhdr
+Prepend a QDOS file header (default).
+
+@item -xtcc
+Append an XTcc style trailer.
+
+@item -stack=val
+Set the stack size required by the program to @code{val}. Affects the
+dataspace size calculation. Defaults to 4096.
+
 @end table
 
 
@@ -1246,6 +1353,17 @@ alphabetical order, probably not complete):
 @item %s (%s+0x%x): Absolute reference to resident data section (%s)
 @item %s line %d: Undefined memory region: <%s>
 @item Target %s: multiple %s sections not allowed: <%s> and <%s>
+@item %s: symbol index %u is out of range
+@item %s: %s is chained
+@item Maximum file option size exceeded (%u)
+@item %s: Ignoring weak symbol %s
+@item %s: Unexpected relocations for section with index=%d
+@item Bad error number: %d
+@item Error number %d is not a warning
+@item %s (%s): alternating bits per byte in object files (from %d to %d)
+@item %s (%s): alternating bytes per address in object files (from %d to %d)
+@item Endianess is unknown. Default to host endianess.
+@item Mismatching target address sizes in input/output formats
 
 @end enumerate
 

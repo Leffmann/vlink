@@ -14,7 +14,7 @@
 #include "rel_elfx86_64.h"
 
 
-static int x86_64_identify(char *,uint8_t *,unsigned long,bool);
+static int x86_64_identify(struct GlobalVars *,char *,uint8_t *,unsigned long,bool);
 static void x86_64_readconv(struct GlobalVars *,struct LinkFile *);
 static struct Symbol *x86_64_dynentry(struct GlobalVars *,DynArg,int);
 static void x86_64_dyncreate(struct GlobalVars *);
@@ -24,6 +24,7 @@ static void x86_64_writeexec(struct GlobalVars *,FILE *);
 
 struct FFFuncs fff_elf64x86 = {
   "elf64x86",
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -58,7 +59,8 @@ struct FFFuncs fff_elf64x86 = {
 /*****************************************************************/
 
 
-static int x86_64_identify(char *name,uint8_t *p,unsigned long plen,bool lib)
+static int x86_64_identify(struct GlobalVars *gv,char *name,uint8_t *p,
+                           unsigned long plen,bool lib)
 /* identify ELF-x86_64-LittleEndian */
 {
   return elf_identify(&fff_elf64x86,name,p,plen,
