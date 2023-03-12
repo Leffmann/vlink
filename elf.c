@@ -1335,7 +1335,8 @@ size_t elf_addrela(struct GlobalVars *gv,struct LinkedSection *ls,
       else
         ierror("elf_addrela(): Reloc type %d (%s) at %s+0x%lx (addend 0x%llx)"
                " is missing a relocsect.lnk",(int)rel->rtype,
-               reloc_name[rel->rtype],ls->name,rel->offset,rel->addend);
+               reloc_name[rel->rtype],ls->name,rel->offset,
+               (unsigned long long)rel->addend);
     }
     symidx = (uint32_t)(rel->relocsect.lnk->index + secsyms);
   }
@@ -1345,7 +1346,8 @@ size_t elf_addrela(struct GlobalVars *gv,struct LinkedSection *ls,
 
     if (ri = rel->insert)
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,ri->mask,ls->name,rel->offset);
+            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            ls->name,rel->offset);
     else
       ierror("elf_addrela(): Reloc without insert-field");
   }

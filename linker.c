@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.16d (29.02.20)
+/* $VER: vlink linker.c V0.16e (13.06.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -457,7 +457,8 @@ static struct LinkedSection *get_matching_lnksec(struct GlobalVars *gv,
             return (lsn);
           }
 
-          if (gv->merge_same_type && lsn->type==sec->type) {
+          if (gv->merge_all ||
+              (gv->merge_same_type && lsn->type==sec->type)) {
             merge_sec_attrs(lsn,sec,f);
             return (lsn);
           }
@@ -537,7 +538,8 @@ static unsigned long allocate_common(struct GlobalVars *gv,
 
         if (gv->map_file)
           fprintf(gv->map_file,"Allocating common %s: %x at %llx hex\n",
-                  sym->name,(int)sym->size,(lword)sec->va+sym->value);
+                  sym->name,(int)sym->size,
+                  (unsigned long long)sec->va+sym->value);
       }
     }
   }
@@ -562,10 +564,10 @@ void print_symbol(struct GlobalVars *gv,FILE *f,struct Symbol *sym)
 #if 0
     fprintf(f,"  %s: %s%s%s, value 0x%llx, size %d\n",sym->name,
             sym_bind[sym->bind],sym_type[sym->type],sym_info[sym->info],
-            (uint64_t)sym->value,(int)sym->size);
+            (unsigned long long)sym->value,(int)sym->size);
 #else
     fprintf(f,"  0x%0*llx %s: %s%s%s, size %d\n",
-            gv->bits_per_taddr/4,(uint64_t)sym->value,sym->name,
+            gv->bits_per_taddr/4,(unsigned long long)sym->value,sym->name,
             sym_bind[sym->bind],sym_type[sym->type],sym_info[sym->info],
             (int)sym->size);
 #endif
@@ -1087,6 +1089,12 @@ void linker_resolve(struct GlobalVars *gv)
           continue;
         }
 
+        if ((xref->flags & RELF_WEAK) &&
+            (gv->dest_object || gv->dest_sharedobj)) {
+          /* resolve weak symbols only in executables */
+          continue;
+        }
+
         /* find a global symbol with this name in any object or library */
         xdef = findsymbol(gv,sec,xref->xrefname);
 
@@ -1577,11 +1585,16 @@ void linker_join(struct GlobalVars *gv)
           }
           free_patterns(filepattern,secpatterns);
         }
-        else  /* merge art. section created by a data command */
+        else { /* merge art. section created by a data command */
           merge_ld_section(gv,~0,ls,sec);
+          if (ls->type == ST_UNDEFINED)
+            ls->type = ST_DATA;   /* sect. becomes data due to data elements */
+          ls->flags |= SF_ALLOC;  /* @@@ data should allocate the section */
+        }
 
         /* keep section size up to date */
-        ls->size = ls->relocmem->current - ls->base;
+        if (ls->relocmem->current - ls->base > ls->size)
+          ls->size = ls->relocmem->current - ls->base;
         if (sec = last_initialized(ls))
           ls->filesize = (sec->va + sec->size) - ls->base;
         else
@@ -2207,7 +2220,8 @@ void linker_relocate(struct GlobalVars *gv)
             print_function_name(sec,rel->offset);
             error(25,getobjname(sec->obj),sec->name,rel->offset-sec->offset,
                   (int)rel->insert->bsiz,reloc_name[rel->rtype],
-                  rel->relocsect.lnk->name,rel->addend,a);
+                  rel->relocsect.lnk->name,
+                  (unsigned long long)rel->addend,(unsigned long long)a);
           }
         }
 
@@ -2425,8 +2439,10 @@ void linker_relocate(struct GlobalVars *gv)
                 /* value of referenced symbol is out of range! */
                 print_function_name(sec,xref->offset);
                 error(err_no,getobjname(sec->obj),sec->name,
-                      xref->offset-sec->offset,xdef->name,xdef->value,
-                      xref->addend,a,(int)xref->insert->bsiz);
+                      (unsigned long long)xref->offset-sec->offset,
+                      xdef->name,(unsigned long long)xdef->value,
+                      (unsigned long long)xref->addend,
+                      (unsigned long long)a,(int)xref->insert->bsiz);
               }
             }
           }

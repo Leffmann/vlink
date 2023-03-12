@@ -274,7 +274,15 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
     else
       a = (int32_t)readsection(gv,rtype,sec->data+offs,&ri);
 
-    if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
+    if (ELF32_ST_BIND(*sym->st_info) == STB_WEAK) {
+      /* reference to a weak symbol may always be replaced, even when
+         already defined in its module, so we better resolve it again */
+      xrefname = elf32_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
+                              read32(be,sym->st_name);
+      relsec = NULL;
+      r->flags |= RELF_WEAK;
+    }
+    else if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
       /* undefined or common symbol - create external reference */
       xrefname = elf32_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
                               read32(be,sym->st_name);
@@ -299,10 +307,6 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
 
     r = newreloc(gv,sec,xrefname,relsec,0,(unsigned long)offs,rtype,a);
     addreloc_ri(sec,r,&ri);
-
-    /* referenced symbol is weak? */
-    if (xrefname!=NULL && ELF32_ST_BIND(*sym->st_info)==STB_WEAK)
-      r->flags |= RELF_WEAK;
 
     /* make sure that section data reflects this addend for other formats */
     if (is_rela)
@@ -1121,7 +1125,8 @@ static size_t elf32_putdynreloc(struct GlobalVars *gv,struct LinkedSection *ls,
 
     if (ri = rel->insert)
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,ri->mask,ls->name,rel->offset);
+            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            ls->name,rel->offset);
     else
       ierror("%s Reloc without insert-field",fn);
   }

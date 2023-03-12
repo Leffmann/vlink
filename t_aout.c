@@ -1310,7 +1310,8 @@ static uint32_t aoutstd_getrinfo(struct GlobalVars *gv,struct Reloc *rel,
     else {
       /* unsupported relocation type */
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,ri->mask,sname,rel->offset);
+            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            sname,rel->offset);
     }
   }
 

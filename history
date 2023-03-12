@@ -15,6 +15,26 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.16e (07.07.20)
+o Changing the address within an output section in a linker script didn't
+  work correctly when the destination memory region (load-address) differs
+  from the relocation memory region (execution-address).
+o Data commands in linker scripts didn't work when there was nothing
+  else in the output section.
+o Fixed a segfault when a linker script moves the address counter backwards
+  inside an output section.
+o Fixed uninitialized pointer when loading input files via a linker-script
+  INPUT command.
+o New linker-script command: RESERVE(n) to reserve n bytes of memory and
+  fill it with the current FILL value.
+o FILL-pattern should always be written in big-endian.
+o Replaced FILL command by FILL8 and FILL16.
+o New option -mall to merge everything into a single output section.
+o Weak symbols must only be resolved in executables.
+o (rawbin) Motorola S-Records: Fixed start address in S8 and S9 trailer.
+o (vobj) Fixed reference to a defined weak symbol in an object.
+o (elf) Fixed reference to a defined weak symbol in an object.
+
 - 0.16d (18.04.20)
 o New option -N for renaming input sections.
 o New option -vicelabels to generate a label-address mapping for the

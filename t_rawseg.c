@@ -163,8 +163,8 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                 if (r->rtype!=R_ABS || ri->bpos!=0 || ri->bsiz!=32) {
                   /* only absolute 32-bit relocs are supported */
                   error(32,fff_rawseg.tname,reloc_name[r->rtype],
-                        (int)ri->bpos,(int)ri->bsiz,ri->mask,
-                        ls->name,r->offset);
+                        (int)ri->bpos,(int)ri->bsiz,
+                        (unsigned long long)ri->mask,ls->name,r->offset);
                   continue;
                 }
               }
@@ -178,7 +178,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                   ierror("%sReloc type %d (%s) at %s+0x%lx "
                          "(addend 0x%llx) is missing a relocsect.lnk",
                          fn,(int)r->rtype,reloc_name[r->rtype],ls->name,
-                         r->offset,r->addend);
+                         r->offset,(unsigned long long)r->addend);
               }
               relsec = r->relocsect.lnk;
 
@@ -205,7 +205,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                   if (ri = r->insert)
                     error(35,gv->dest_name,ls->name,r->offset,v,
                           reloc_name[r->rtype],(int)ri->bpos,
-                          (int)ri->bsiz,ri->mask);
+                          (int)ri->bsiz,(unsigned long long)ri->mask);
                   else
                     ierror("%sReloc (%s+%lx), type=%s, without RelocInsert",
                            fn,ls->name,r->offset,reloc_name[r->rtype]);
@@ -243,7 +243,8 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
             }
             /* write file name, start addr. and length of segment to output */
             fprintf(f,"\"%s\" 0x%llx 0x%llx\n",
-                    buf,p->start,p->mem_end-p->start);
+                    buf,(unsigned long long)p->start,
+                    (unsigned long long)p->mem_end-p->start);
           }
 
           if (!firstsec) {

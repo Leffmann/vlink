@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.16d (28.02.20)
+/* $VER: vlink main.c V0.16e (16.05.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -46,7 +46,7 @@ static lword get_assign_arg(int argc,const char *argv[],int *i,
 {
   const char *p = get_arg(argc,argv,i);
   char *n = name;
-  lword val;
+  long long val;
 
   while (--len && *p!='\0' && *p!='=')
     *n++ = *p++;
@@ -63,7 +63,7 @@ static lword get_assign_arg(int argc,const char *argv[],int *i,
     error(130,argv[*i-1]);  /* bad assignment */
     return 0;  /* not reached */
   }
-  return val;
+  return (lword)val;
 }
 
 
@@ -343,6 +343,8 @@ int main(int argc,const char *argv[])
             gv->auto_merge = TRUE;
           else if (!strcmp(&argv[i][2],"type"))
             gv->merge_same_type = TRUE;
+          else if (!strcmp(&argv[i][2],"all"))
+            gv->merge_all = TRUE;
           else if (!strcmp(&argv[i][2],"ultibase"))
             gv->multibase = TRUE;
           else
@@ -619,8 +621,12 @@ int main(int argc,const char *argv[])
 
         case 'T':  /* read linker script file or set text address */
           if (!strcmp(&argv[i][2],"text")) {
-            if (i+1 < argc)
-              sscanf(argv[++i],"%lli",&gv->start_addr);
+            if (i+1 < argc) {
+              long long tmp;
+
+              sscanf(argv[++i],"%lli",&tmp);
+              gv->start_addr = tmp;
+            }
             else
               error(5,'T');  /* option requires argument */
           }

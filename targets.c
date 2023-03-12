@@ -1004,7 +1004,8 @@ void calc_relocs(struct GlobalVars *gv,struct LinkedSection *ls)
       else
         ierror("calc_relocs: Reloc type %d (%s) at %s+0x%lx (addend 0x%llx)"
                " is missing a relocsect.lnk",
-               (int)r->rtype,reloc_name[r->rtype],ls->name,r->offset,r->addend);
+               (int)r->rtype,reloc_name[r->rtype],ls->name,r->offset,
+               (unsigned long long)r->addend);
     }
 
     s = r->relocsect.lnk->base;
@@ -1043,7 +1044,7 @@ void calc_relocs(struct GlobalVars *gv,struct LinkedSection *ls)
       /* Calculated value doesn't fit into relocation type x ... */
       if (ri = r->insert)
         error(35,gv->dest_name,ls->name,r->offset,val,reloc_name[r->rtype],
-              (int)ri->bpos,(int)ri->bsiz,ri->mask);
+              (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask);
       else
         ierror("%sReloc (%s+%lx), type=%s, without RelocInsert",
                fn,ls->name,r->offset,reloc_name[r->rtype]);
@@ -1776,6 +1777,9 @@ static void write_constructors(struct GlobalVars *gv,struct ObjectUnit *ou,
   struct PriPointer *pp;
   int extraslots;
 
+  if(asize == 0)
+    asize = gv->bits_per_taddr / 8;
+
   /* Format for vbcc constructors: <num>, [ <ptrs>... ], NULL */
   /* Format for SAS/C constructors: [ <ptrs>...], NULL */
   switch (gv->collect_ctors_type) {
@@ -1846,6 +1850,7 @@ void make_constructors(struct GlobalVars *gv)
     struct PriPointer *pp;
     uint8_t *data;
     struct ObjectUnit *ou;
+    unsigned int asize;
 
     /* check if constructors or destructors are needed (referenced) */
     if (gv->ctor_symbol) {
@@ -1900,10 +1905,14 @@ void make_constructors(struct GlobalVars *gv)
       }
     }
 
+    asize = fff[gv->dest_format]->addr_bits / 8;
+    if(asize == 0)
+      asize = gv->bits_per_taddr / 8;
+
     /* create artificial object */
-    clen = (unsigned long)(fff[gv->dest_format]->addr_bits / 8) *
+    clen = (unsigned long)(asize) *
             (ctors ? nctors+2 : 0);
-    dlen = (unsigned long)(fff[gv->dest_format]->addr_bits / 8) *
+    dlen = (unsigned long)(asize) *
             (dtors ? ndtors+2 : 0);
     data = alloczero(clen + dlen);
     ou = art_objunit(gv,"INITEXIT",data,clen+dlen);
@@ -2038,8 +2047,10 @@ lword entry_address(struct GlobalVars *gv)
       return (lword)sym->value;
     }
     else if (isdigit((unsigned char)*gv->entry_name)) {
-      if (sscanf(gv->entry_name,"%lli",&entry) == 1)
-        return entry;
+      long long tmp;
+
+      if (sscanf(gv->entry_name,"%lli",&tmp) == 1)
+        return entry = tmp;
     }
   }
 

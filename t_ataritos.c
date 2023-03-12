@@ -266,7 +266,7 @@ void tos_writerelocs(struct GlobalVars *gv,FILE *f,
           if (rel->rtype!=R_ABS || ri->bpos!=0 || ri->bsiz!=32) {
             if (rel->rtype==R_ABS && (ri->bpos!=0 || ri->bsiz!=32))
               error(32,fff_ataritos.tname,reloc_name[rel->rtype],
-                    (int)ri->bpos,(int)ri->bsiz,ri->mask,
+                    (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
                     sections[i]->name,rel->offset);
             continue;
           }

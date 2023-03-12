@@ -25,6 +25,9 @@ void *alloc(size_t size)
     size = 1;
   if (!(p = malloc(size)))
     error(1);  /* out of memory */
+#ifdef DEBUG
+  memset(p,0x55,size);
+#endif
   return p;
 }
 
@@ -813,7 +816,7 @@ void memset16(struct GlobalVars *gv,void *start,uint16_t fill,long n)
     uint8_t *p;
     int i;
 
-    write16(gv->endianess==_BIG_ENDIAN_,f,fill);
+    write16(1,f,fill);  /* pattern in big-endian */
     for (p=start,i=((unsigned long)start)&1; n; n--,i^=1)
       *p++ = f[i];
   }

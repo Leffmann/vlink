@@ -1199,8 +1199,9 @@ static void get_resident_sdrelocs(struct GlobalVars *gv)
             }
             else {  /* unsupported abs reloc in resident SD section */
               if (ri != NULL)
-                error(133,(lword)(r->offset+sec->offset),
-                      (int)ri->bpos,(int)ri->bsiz,(lword)ri->mask);
+                error(133,(unsigned long long)r->offset+sec->offset,
+                      (int)ri->bpos,(int)ri->bsiz,
+                      (unsigned long long)ri->mask);
               else
                 ierror("get_resident_sdrelocs(): missing rel reloc info");
             }
@@ -1238,8 +1239,9 @@ static void get_resident_sdrelocs(struct GlobalVars *gv)
               }
               else {  /* unsupported abs reloc in resident SD section */
                 if (ri != NULL)
-                  error(133,(lword)(r->offset+sec->offset),
-                        (int)ri->bpos,(int)ri->bsiz,(lword)ri->mask);
+                  error(133,(unsigned long long)r->offset+sec->offset,
+                        (int)ri->bpos,(int)ri->bsiz,
+                        (unsigned long long)ri->mask);
                 else
                   ierror("get_resident_sdrelocs(): missing xref reloc info");
               }
@@ -1561,7 +1563,7 @@ static void unsupp_relocs(struct LinkedSection *sec)
   while (rel = (struct Reloc *)remhead(&sec->relocs)) {
     error(32,fff_amigahunk.tname,reloc_name[rel->rtype],
           (int)rel->insert->bpos,(int)rel->insert->bsiz,
-          rel->insert->mask,sec->name,rel->offset);
+          (unsigned long long)rel->insert->mask,sec->name,rel->offset);
   }
 }
 
@@ -1633,7 +1635,7 @@ rtype_done:
     if (!rtype) {
       error(32,fff_amigahunk.tname,reloc_name[xref->rtype],
             (int)xref->insert->bpos,(int)xref->insert->bsiz,
-            xref->insert->mask,sec->name,xref->offset);
+            (unsigned long long)xref->insert->mask,sec->name,xref->offset);
       rtype = EXT_RELREF8;  /* @@@ to keep the loop running */
     }
 

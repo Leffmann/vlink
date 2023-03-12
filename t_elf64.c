@@ -1,8 +1,8 @@
-/* $VER: vlink t_elf64.c V0.15b (08.07.16)
+/* $VER: vlink t_elf64.c V0.16e (13.06.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -274,7 +274,15 @@ static void elf64_reloc(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
     else
       a = readsection(gv,rtype,sec->data+offs,&ri);
 
-    if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
+    if (ELF64_ST_BIND(*sym->st_info) == STB_WEAK) {
+      /* reference to a weak symbol may always be replaced, even when
+         already defined in its module, so we better resolve it again */
+      xrefname = elf64_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
+                              read32(be,sym->st_name);
+      relsec = NULL;
+      r->flags |= RELF_WEAK;
+    }
+    else if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
       /* undefined or common symbol - create external reference */
       xrefname = elf64_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
                               read32(be,sym->st_name);
@@ -299,10 +307,6 @@ static void elf64_reloc(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
 
     r = newreloc(gv,sec,xrefname,relsec,0,(unsigned long)offs,rtype,a);
     addreloc_ri(sec,r,&ri);
-
-    /* referenced symbol is weak? */
-    if (xrefname!=NULL && ELF64_ST_BIND(*sym->st_info)==STB_WEAK)
-      r->flags |= RELF_WEAK;
 
     /* make sure that section data reflects this addend for other formats */
     if (is_rela)
@@ -1126,7 +1130,8 @@ static size_t elf64_putdynreloc(struct GlobalVars *gv,struct LinkedSection *ls,
 
     if (ri = rel->insert)
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,ri->mask,ls->name,rel->offset);
+            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            ls->name,rel->offset);
     else
       ierror("%s Reloc without insert-field",fn);
   }

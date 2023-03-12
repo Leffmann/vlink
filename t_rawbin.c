@@ -1,4 +1,4 @@
-/* $VER: vlink t_rawbin.c V0.16d (01.04.20)
+/* $VER: vlink t_rawbin.c V0.16e (04.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -371,7 +371,7 @@ struct FFFuncs fff_ihex = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32
+  0   /* addr_bits from input */
 };
 #endif
 
@@ -686,7 +686,7 @@ static void amsdos_write(struct GlobalVars *gv,FILE *f)
 
 #ifdef CBMPRG
 static void cbmprg_write(struct GlobalVars *gv,FILE *f)
-/* creates one or more raw-binary files with a Commodore header, suitable */
+/* creates a raw-binary file with a Commodore header, suitable */
 /* for loading as an executable on PET, VIC-20, 64, etc. computers */
 {
   rawbin_writeexec(gv,f,TRUE,'c');
@@ -696,7 +696,7 @@ static void cbmprg_write(struct GlobalVars *gv,FILE *f)
 
 #ifdef JAGSRV
 static void jagsrv_write(struct GlobalVars *gv,FILE *f)
-/* creates one or more raw-binary files with a JAGSRV header, suitable */
+/* creates a raw-binary file with a JAGSRV header, suitable */
 /* for loading and executing on a SkunkBoard equipped Atari Jaguar, or */
 /* a VirtualJaguar emulator */
 {
@@ -782,7 +782,7 @@ static void srec_write(struct GlobalVars *gv,FILE *f,int addrsize)
 
   /* write trailer */
   write32be(buf,(uint32_t)execaddr);
-  SRecOut(f,11-addrsize,buf,addrsize);
+  SRecOut(f,11-addrsize,buf+4-addrsize,addrsize);
 }
 
 #endif

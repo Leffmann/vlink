@@ -1,4 +1,4 @@
-/* $VER: vlink vlink.h V0.16d (28.02.20)
+/* $VER: vlink vlink.h V0.16e (16.05.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -221,7 +221,7 @@ struct Section {
 #define ST_DATA 2               /* section contains initialized data */
 #define ST_UDATA 3              /* section contains uninitialized data */
 #define ST_TMP 4                /* a temporary, linker-generated section */
-#define ST_LAST 4               /* last section type */
+#define ST_LAST 3               /* last real section type */
 
 /* section flags */
 #define SF_ALLOC           0x01 /* allocate section in memory */
@@ -494,10 +494,12 @@ struct GlobalVars {
   uint8_t min_alignment;        /* minimal section alignment (default 0) */
   bool auto_merge;              /* merge sections with pc-rel. references */
   bool merge_same_type;         /* merge all sections of same type */
+  bool merge_all;               /* merge everything into a single section */
   uint8_t gc_sects;             /* garbage-collect unreferenced sections */
   bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
   bool keep_sect_order;         /* keep order of section as found in objs */
   uint8_t bits_per_taddr;       /* bits in target address (taddr, lword) */
+  uint8_t reserved;
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   FILE *vice_file;              /* label-file for the VICE emulator */

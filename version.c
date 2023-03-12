@@ -1,4 +1,4 @@
-/* $VER: vlink version.c V0.16d (28.02.20)
+/* $VER: vlink version.c V0.16e (27.04.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -7,7 +7,7 @@
 
 
 /* version/revision */
-#define VERSION "0.16d"
+#define VERSION "0.16e"
 
 #define VERSION_C
 #include "vlink.h"
@@ -40,7 +40,7 @@ void show_usage(void)
          "[-gc-all] [-gc-empty] "
          "[-hunkattr secname=value] [-interp path] "
          "[-L library-search-path] [-l library-specifier] [-minalign value] "
-         "[-mrel] [-mtype] [-multibase] [-nostdlib] "
+         "[-mrel] [-mtype] [-mall] [-multibase] [-nostdlib] "
          "[-N old new] "
          "[-o filename] [-osec] [-P symbol] "
          "[-rpath path] [-sc] [-sd] [-shared] [-soname name] [-static] "
@@ -98,6 +98,7 @@ void show_usage(void)
          "-sd               merge all data and bss sections\n"
          "-mrel             merge sections with pc-relative references\n"
          "-mtype            merge all sections with the same type\n"
+         "-mall             merge all sections to a single output section\n"
          "-M                print segment mappings and symbol values\n"
          "-k                keep original section order\n"
          "-n                no page alignment\n"
