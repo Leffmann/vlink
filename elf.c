@@ -443,7 +443,6 @@ struct Section *elf_dyntable(struct GlobalVars *gv,
   static const char fn[] = "elf_dyntable():";
   static const char *secname[] = { NULL, got_name, plt_name };
   struct Section *sec,**secp;
-  struct ObjectUnit *ou;
   int symidx = -1;
 
   switch (type) {
@@ -468,7 +467,7 @@ struct Section *elf_dyntable(struct GlobalVars *gv,
   /* Section does not exist - create it.
      The offset field is used for the next table entry offset. */
   sec = add_section(gv->dynobj,(char *)secname[type],NULL,initial_size,
-                    sectype,secflags,secprot,2,TRUE);
+                    sectype,secflags,secprot,gv->ptr_alignment,TRUE);
   sec->offset = initial_offset;
   *secp = sec;
 
@@ -501,8 +500,8 @@ void elf_adddynsym(struct Symbol *sym)
 }
 
 
-void elf_dynreloc(struct ObjectUnit *ou,struct Reloc *r,int relafmt,
-                  size_t elfrelsize)
+void elf_dynreloc(struct GlobalVars *gv,struct ObjectUnit *ou,
+                  struct Reloc *r,int relafmt,size_t elfrelsize)
 {
   const char *secname;
   struct Section **secp;
@@ -533,7 +532,8 @@ void elf_dynreloc(struct ObjectUnit *ou,struct Reloc *r,int relafmt,
 
   /* make sure that dynamic relocation section exists */
   if (*secp == NULL)
-    *secp = add_section(ou,secname,NULL,0,ST_DATA,SF_ALLOC,SP_READ,2,TRUE);
+    *secp = add_section(ou,secname,NULL,0,ST_DATA,SF_ALLOC,SP_READ,
+                        gv->ptr_alignment,TRUE);
 
   /* increase size for new entry */
   (*secp)->size += elfrelsize;
@@ -570,11 +570,13 @@ struct Section *elf_initdynlink(struct GlobalVars *gv)
 
   /* .hash, .dynsym, .dynstr and .dynamic are always present.
      Set them to an initial size. They will grow with dynamic symbols added. */
-  add_section(ou,hash_name,NULL,0,ST_DATA,SF_ALLOC,SP_READ,2,TRUE);
-  add_section(ou,dynsym_name,NULL,0,ST_DATA,SF_ALLOC,SP_READ,2,TRUE);
+  add_section(ou,hash_name,NULL,0,ST_DATA,SF_ALLOC,SP_READ,
+              gv->ptr_alignment,TRUE);
+  add_section(ou,dynsym_name,NULL,0,ST_DATA,SF_ALLOC,SP_READ,
+              gv->ptr_alignment,TRUE);
   add_section(ou,dynstr_name,NULL,0,ST_DATA,SF_ALLOC,SP_READ,0,TRUE);
   dynsec = add_section(ou,dyn_name,NULL,0,ST_DATA,SF_ALLOC,
-                       SP_READ|SP_WRITE,2,TRUE);
+                       SP_READ|SP_WRITE,gv->ptr_alignment,TRUE);
 
   /* assign symbol _DYNAMIC the address of the .dynamic section */
   sym = elf_makelnksym(gv,DYNAMICSYM);
@@ -622,7 +624,6 @@ struct Symbol *elf_pltgotentry(struct GlobalVars *gv,struct Section *sec,
   if (tabsym == NULL) {
     static uint8_t dyn_reloc_types[] = { R_NONE,R_GLOBDAT,R_JMPSLOT,R_COPY };
     struct Reloc *r;
-    uint8_t rtype;
 
     tabsym = findlocsymbol(gv,sec->obj,entryname);
     if (tabsym == NULL) {
@@ -645,7 +646,7 @@ struct Symbol *elf_pltgotentry(struct GlobalVars *gv,struct Section *sec,
          need an R_COPY relocation either! */
     }
     addreloc(sec,r,0,addrsize,-1);  /* size,mask only important for R_ABS */
-    elf_dynreloc(gv->dynobj,r,relaflag,relocsize);
+    elf_dynreloc(gv,gv->dynobj,r,relaflag,relocsize);
 
     /* increase offset and size counters of table-section */
     sec->offset += offsadd;
@@ -666,7 +667,7 @@ struct Symbol *elf_bssentry(struct GlobalVars *gv,const char *secname,
 
   if (gv->dynobj == NULL)
     ierror("elf_bssentry(): no dynobj");
-  newxdef = bss_entry(gv->dynobj,secname,xdef);
+  newxdef = bss_entry(gv,gv->dynobj,secname,xdef);
 
   if (newxdef) {
     /* entry in BSS was done, so we need a R_COPY relocation */
@@ -676,7 +677,7 @@ struct Symbol *elf_bssentry(struct GlobalVars *gv,const char *secname,
     r = newreloc(gv,xdef->relsect,xdef->name,NULL,0,0,R_COPY,0);
     r->relocsect.symbol = xdef;
     addreloc(xdef->relsect,r,0,addrsize,-1);  /* mask/size irrel. for R_COPY */
-    elf_dynreloc(xdef->relsect->obj,r,relaflag,relocsize);
+    elf_dynreloc(gv,xdef->relsect->obj,r,relaflag,relocsize);
   }
 
   return xdef;

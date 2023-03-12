@@ -372,7 +372,8 @@ void elf_setlnksym(struct GlobalVars *,struct Symbol *);
 struct Section *elf_dyntable(struct GlobalVars *,unsigned long,unsigned long,
                              uint8_t,uint8_t,uint8_t,int);
 void elf_adddynsym(struct Symbol *);
-void elf_dynreloc(struct ObjectUnit *,struct Reloc *,int,size_t);
+void elf_dynreloc(struct GlobalVars *,struct ObjectUnit *,struct Reloc *,
+                  int,size_t);
 struct Section *elf_initdynlink(struct GlobalVars *);
 struct Symbol *elf_pltgotentry(struct GlobalVars *,struct Section *,DynArg,
                                uint8_t,unsigned long,unsigned long,int,

@@ -47,7 +47,7 @@ struct FFFuncs fff_elf32armle = {
   0,
   RTAB_STANDARD,RTAB_STANDARD|RTAB_ADDEND,
   _LITTLE_ENDIAN_,
-  32
+  32,2
 };
 
 

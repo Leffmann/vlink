@@ -1,8 +1,8 @@
-/* $VER: vlink t_elf32.c V0.15b (08.07.16)
+/* $VER: vlink t_elf32.c V0.16f (05.08.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -17,9 +17,6 @@
 /* static data required for output file generation */
 static struct RelocList *reloclist;
 static struct Section *dynamic;
-/* .hash table */
-static struct SymbolNode **dyn_hash;
-static size_t dyn_hash_entries;
 /* stabs */
 static struct ShdrNode *stabshdr;
 static struct list stabcompunits;
@@ -274,16 +271,9 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
     else
       a = (int32_t)readsection(gv,rtype,sec->data+offs,&ri);
 
-    if (ELF32_ST_BIND(*sym->st_info) == STB_WEAK) {
-      /* reference to a weak symbol may always be replaced, even when
-         already defined in its module, so we better resolve it again */
-      xrefname = elf32_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
-                              read32(be,sym->st_name);
-      relsec = NULL;
-      r->flags |= RELF_WEAK;
-    }
-    else if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
-      /* undefined or common symbol - create external reference */
+    if (shndx == SHN_UNDEF || shndx == SHN_COMMON ||
+        ELF32_ST_BIND(*sym->st_info) == STB_WEAK) {
+      /* undefined, common or weak symbol - create external reference */
       xrefname = elf32_strtab(lf,ehdr,read32(be,symhdr->sh_link)) +
                               read32(be,sym->st_name);
       relsec = NULL;
@@ -307,6 +297,9 @@ static void elf32_reloc(struct GlobalVars *gv,struct Elf32_Ehdr *ehdr,
 
     r = newreloc(gv,sec,xrefname,relsec,0,(unsigned long)offs,rtype,a);
     addreloc_ri(sec,r,&ri);
+
+    if (xrefname!=NULL && ELF32_ST_BIND(*sym->st_info)==STB_WEAK)
+      r->flags |= RELF_WEAK;  /* referenced symbol is weak */
 
     /* make sure that section data reflects this addend for other formats */
     if (is_rela)
@@ -425,7 +418,7 @@ void elf32_parse(struct GlobalVars *gv,struct LinkFile *lf,
   struct ObjectUnit *u;
   struct Elf32_Shdr *shdr;
   uint16_t i,num_shdr,dynstr_idx,dynsym_idx;
-  char *shstrtab,*dynstrtab;
+  char *shstrtab;
   struct Elf32_Dyn *dyn;
 
   shstrtab = elf32_shstrtab(lf,ehdr);
@@ -483,7 +476,6 @@ void elf32_parse(struct GlobalVars *gv,struct LinkFile *lf,
 
 
     case ET_DYN:  /* shared object file */
-      dynstrtab = NULL;
       dyn = NULL;
       dynstr_idx = dynsym_idx = 0;
       num_shdr = read16(be,ehdr->e_shnum);

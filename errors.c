@@ -1,4 +1,4 @@
-/* $VER: vlink errors.c V0.16d (17.02.20)
+/* $VER: vlink errors.c V0.16f (21.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -109,7 +109,7 @@ static struct {
   "%s line %d: GNU command <%s> ignored",EF_WARNING,
   "%s line %d: Unknown memory region <%s>",EF_ERROR,                /* 70 */
   "%s line %d: Multiple constructor types in output file",EF_ERROR,
-  "UNUSED %s line %d: Syntax error",EF_ERROR,
+  "UNUSED! %s line %d: Unknown keyword <%s>",EF_ERROR,
   "%s line %d: Assertion failed: %s",EF_FATAL,
   "%s line %d: SECTIONS block defined twice",EF_ERROR,
   "%s line %d: Segment %s is closed and can't be reused",EF_ERROR,  /* 75 */
@@ -191,6 +191,10 @@ static struct {
   "Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=0x%llx) "
     "in resident data section",EF_ERROR,
   "%s (%s+0x%x): Absolute reference to resident data section (%s)",EF_WARNING,
+  "%s line %d: Undefined memory region: <%s>",EF_ERROR,            /* 135 */
+  "Executable section <%s> in data segment not allowed",EF_ERROR,
+  "Not enough space for the module header (%u of %u)",EF_ERROR,
+  "Target %s: multiple %s sections not allowed:<%s> and <%s>",EF_ERROR,
 };
 
 

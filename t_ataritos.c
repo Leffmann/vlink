@@ -46,7 +46,7 @@ struct FFFuncs fff_ataritos = {
   0,
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR
 };
 
@@ -103,8 +103,6 @@ static int tos_initwrite(struct GlobalVars *gv,
    will become .text, .data and .bss,
    then count the number of symbol definitions and references */
 {
-  static const char *fn = "tos_initwrite(): ";
-  struct LinkedSection *ls;
   struct Symbol *sym;
   struct Reloc *xref;
   int i,cnt;

@@ -1,4 +1,4 @@
-/* $VER: vlink ldscript.c V0.16e (06.07.20)
+/* $VER: vlink ldscript.c V0.16f (25.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -50,18 +50,22 @@ static const char *defnot = " note";
 /* Linker script functions: */
 static int sf_addr(struct GlobalVars *,lword,lword *);
 static int sf_align(struct GlobalVars *,lword,lword *);
+static int sf_length(struct GlobalVars *,lword,lword *);
 static int sf_loadaddr(struct GlobalVars *,lword,lword *);
 static int sf_max(struct GlobalVars *,lword,lword *);
 static int sf_min(struct GlobalVars *,lword,lword *);
+static int sf_origin(struct GlobalVars *,lword,lword *);
 static int sf_sizeof(struct GlobalVars *,lword,lword *);
 static int sf_sizeofheaders(struct GlobalVars *,lword,lword *);
 
 struct ScriptFunc ldFunctions[] = {
   { "ADDR",sf_addr },
   { "ALIGN",sf_align },
+  { "LENGTH",sf_length },
   { "LOADADDR",sf_loadaddr },
   { "MAX",sf_max },
   { "MIN",sf_min },
+  { "ORIGIN",sf_origin },
   { "SIZEOF",sf_sizeof },
   { "SIZEOF_HEADERS",sf_sizeofheaders },
   { NULL,NULL }
@@ -368,6 +372,19 @@ bool is_ld_script(struct ObjectUnit *obj)
 }
 
 
+static struct MemoryDescr *find_memblock(char *name)
+{
+  struct MemoryDescr *md = memory_blocks;
+
+  while (md) {
+    if (!strcmp(md->name,name))
+      return md;
+    md = md->next;
+  }
+  return NULL;
+}
+
+
 void update_address(struct MemoryDescr *rmd,struct MemoryDescr *dmd,
                     unsigned long addbytes)
 {
@@ -501,7 +518,7 @@ static void symbol_assignment(struct GlobalVars *gv,
         scriptsymbol(gv,symname,0,SYM_ABS,symflags);
       }
       else {
-        if (sym = findsymbol(gv,NULL,symname)) {
+        if (sym = findsymbol(gv,NULL,symname,0)) {
           int abs = parse_expr(rmd->current,&expr_val);
 
           if (level < 2)
@@ -553,6 +570,22 @@ static struct LinkedSection *getsection(struct GlobalVars *gv)
 }
 
 
+static struct MemoryDescr *getmemblock(struct GlobalVars *gv)
+{
+  struct MemoryDescr *md = NULL;
+  char *mname;
+
+  if (mname = getword()) {
+    if (!(md = find_memblock(mname)))
+      error(135,scriptname,getlineno(),mname);  /* Undefined memory region */
+  }
+  else
+    error(78,scriptname,getlineno());
+
+  return md;
+}
+
+
 #if DUMMY_SEC_FROM_PATTERN
 static struct Section *make_dummy_sec_from_pattern(struct GlobalVars *gv,
                                                    struct LinkedSection *ls)
@@ -566,7 +599,7 @@ static struct Section *make_dummy_sec_from_pattern(struct GlobalVars *gv,
 
   pp = getpattern();
   if (pp == NULL)
-    ierror("make_dummy_sec_from_pattern(): no pattern?");
+    return NULL;
   np = name = alloc(strlen(pp)+1);
   while (c = *pp++) {
     switch (c) {
@@ -622,6 +655,19 @@ static int sf_align(struct GlobalVars *gv,lword addr,lword *res)
 }
 
 
+static int sf_length(struct GlobalVars *gv,lword addr,lword *res)
+{
+  struct MemoryDescr *md;
+
+  if (startofblock('(')) {
+    if (md = getmemblock(gv))
+      *res = md->len;
+    endofblock('(',')');
+  }
+  return 1;
+}
+
+
 static int sf_loadaddr(struct GlobalVars *gv,lword addr,lword *res)
 {
   struct LinkedSection *ls;
@@ -662,6 +708,19 @@ static int sf_min(struct GlobalVars *gv,lword addr,lword *res)
   }
   *res = val1;
   return abs1;
+}
+
+
+static int sf_origin(struct GlobalVars *gv,lword addr,lword *res)
+{
+  struct MemoryDescr *md;
+
+  if (startofblock('(')) {
+    if (md = getmemblock(gv))
+      *res = md->org;
+    endofblock('(',')');
+  }
+  return 1;
 }
 
 
@@ -960,19 +1019,6 @@ static void sc_searchdir(struct GlobalVars *gv)
 
     endofblock('(',')');
   }
-}
-
-
-static struct MemoryDescr *find_memblock(char *name)
-{
-  struct MemoryDescr *md = memory_blocks;
-
-  while (md) {
-    if (!strcmp(md->name,name))
-      return (md);
-    md = md->next;
-  }
-  return NULL;
 }
 
 
@@ -1425,7 +1471,7 @@ static void predefine_sections(struct GlobalVars *gv)
           if (!strcmp(s_type,"NOLOAD"))
             ls->ld_flags |= LSF_NOLOAD;
           if (fl & 4)
-            ls->destmem = atdefmem;  /* AT(addr) in section definition */
+            ldefmem = atdefmem;  /* AT(addr) in section definition */
 
           new_ls_name = ls->name;
           level = 2;
@@ -1442,8 +1488,11 @@ static void predefine_sections(struct GlobalVars *gv)
                 else if (c == '(') {
                   /* skip section pattern */
                   #if DUMMY_SEC_FROM_PATTERN
-                  if (!dummy_sec)
+                  if (!dummy_sec) {
                     dummy_sec = make_dummy_sec_from_pattern(gv,ls);
+                    if (dummy_sec == NULL)
+                      error(65,scriptname,getlineno(),keyword);
+                  }
                   #else
                   if (!dummy_sec) {
                     dummy_sec = create_section(script_obj,s_name,NULL,0);
@@ -1779,7 +1828,6 @@ static struct Section *reserve_space(struct GlobalVars *gv)
     struct MemoryDescr *dmd = cls ? cls->destmem : vdefmem;
     struct Section *sec;
     const char *name;
-    lword offs;
 
     /* advance address over reserved space */
     if (change_address(rmd,rmd->current+dataval) != dataval)
@@ -1992,7 +2040,7 @@ struct LinkedSection *next_secdef(struct GlobalVars *gv)
    structure. */
 {
   char *keyword;
-  struct Phdr *p;
+  /*struct Phdr *p;*/
 
   level = 1;
   current_ls = NULL;
@@ -2097,8 +2145,9 @@ void init_ld_script(struct GlobalVars *gv)
     preparse = TRUE;
     current_ls = NULL;
     level = 0; /* outside SECTIONS block */
-    defmem = vdefmem = ldefmem = add_memblock(defmemname,MEM_DEFORG,MEM_DEFLEN);
+    defmem = add_memblock(defmemname,MEM_DEFORG,MEM_DEFLEN);
     atdefmem = add_memblock("lmadefault",MEM_DEFORG,MEM_DEFLEN);
+    vdefmem = ldefmem = defmem;
     change_address(defmem,gv->start_addr);
     if (!(scriptname = gv->scriptname))
       scriptname = "built-in script";

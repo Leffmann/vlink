@@ -83,7 +83,7 @@ library search path can also be compiled in and is visible with
 
 The number of output file formats included is configurable at compile time.
 
-@section Supported file formats
+@section Supported File Formats
 The following file formats are supported:
 
 @table @code
@@ -159,6 +159,14 @@ Supports @option{-Rstd}, @option{-Rshort} and @option{-hunkattr}.
 Absolute raw binary output, similar to rawbin2, but with a header
 for Amstrad/Schneider CPC computers.
 
+@item applebin
+Absolute raw binary output, similar to rawbin1, but with a header
+for Apple DOS 3.3 binary files, suitable for Apple II computers.
+
+@item ataricom
+Absolute raw binary output, similar to rawbin1, but with a file header
+and section headers for Atari 8-bit computers (Atari 400, 600, 800, etc.).
+
 @item ataritos
 Atari-ST TOS file format. Executables only at the moment. Symbol table
 in extended DRI format. Symbols may be section- or start-based (option
@@ -169,8 +177,20 @@ constructor/destructor tables
 in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 
 @item cbmprg
-Absolute raw binary output, similar to rawbin2, but with a header
+Absolute raw binary output, similar to rawbin1, but with a header
 for Commodore 8-bit computers (PET, VIC-20, 64, etc.).
+
+@item cbmreu
+Writes multiple images files for the REU memory expansion. Only the
+first one has a Commodore PRG header.
+
+@item cocoml
+Absolute raw binary output, similar to rawbin1, but with segment headers
+and a trailer for Tandy Color Computer machine language files.
+
+@item dragonbin
+Absolute raw binary output, similar to rawbin1, but with a header for
+Dragon DOS binary files, suitable for Dragon 32 and 64 computers.
 
 @item elf32amigaos
 Identical to elf32ppcbe, but when doing dynamic linking it requires that
@@ -248,6 +268,17 @@ Absolute raw binary output, similar to rawbin1, but with a header to make
 it load and execute via the Atari Jaguar SkunkBoard or the VirtualJaguar
 emulator.
 
+@item os9-6809
+OS-9 program modules for the 6809 processor, as defined by Microware
+Systems Corporation and the NitrOS-9 project.
+Code is always position-independant and reentrant. Relocation tables
+for data-text and data-data references are appended at the initialized
+data section in the module. These tables have to be processed by the
+program's startup code. @command{vbcc}-style constructor/destructor tables
+will be created and placed into the data section. By default, the
+module name will be the same as the output file name.
+No support for symbol tables.
+
 @item rawbin1
 Absolute raw binary file. The sections and base addresses
 have to be specified by a linker script (option @option{-T}). Gaps
@@ -298,8 +329,8 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 @section Linker Options
 @command{vlink} command template:
 @example
-  @command{vlink [-dhnqrstvwxMRSX] [-B linkmode] [-b targetname]
-  [-baseoff offset] [-C constructor-type] [-da] [-dc] [-dp] [-EB] [-EL]
+  @command{vlink [-dhmnqrstvwxMRSX] [-B linkmode] [-b targetname]
+  [-baseoff offset] [-C constructor-type] [-Crel] [-da] [-dc] [-dp] [-EB] [-EL]
   [-e entrypoint] [-export-dynamic] [-f flavour] [-fixunnamed]
   [-F filename] [-gc-all] [-gc-empty] [-hunkattr secname=value]
   [-interp path] [-L library-search-path] [-l library-specifier]
@@ -375,13 +406,18 @@ to scan for. Valid types are:
     SAS/C style constructors: @code{__STI[_<pri>]_<name> / __STD..}
 @end table
 
+@item -Crel
+Function references in the constructor/destructor tables (see above)
+are written as relative offsets to their current table position instead
+of absolute pointers. Useful for PC-relative code.
+
 @item -clr-adduscore
 No longer add a preceding underscore for the symbols of the
-following objects in the command line.
+following objects on the command line.
 
 @item -clr-deluscore
 No longer delete a preceding underscore for the symbols of the
-following objects in the command line.
+following objects on the command line.
 
 @item -d
 @itemx -dc
@@ -489,6 +525,15 @@ Produce output about the mapping of sections of the input
 files and the values assigned to symbols in the output file.
 When the optional @code{file name} is missing output goes to stdout.
 
+@item -m
+Enable special treatment of feature-mask suffixes in symbol names.
+A decimal number after the last '@code{.}' in a symbol name is
+stored as a feature-mask for symbol definitions. The masks in references to
+the symbol's name (sans suffix) are combined to a common requirement
+mask, which is used to find the best symbol to fulfill this requirement
+(i.e. the smallest mask which has still all bits of the requirement-mask
+set).
+
 @item -minalign alignment
 Set a minimum alignment (number of bits which have to be zero) for all
 imported sections. The specified @code{alignment} value will only take
@@ -539,6 +584,27 @@ rawbin1, rawbin2, amsdos, cbmprg.
 Works like @option{-osec}, but each output file name will be preceded
 by @file{"basename."}.
 
+@item -os9-mem=val[K]
+Defines the size of the stack and the parameter area, which the
+linker will add to the permanent storage size in the module header.
+The value given in @code{val} is in 256-bytes pages. You may specify
+the value in K-bytes by appending a '@code{k}' character.
+The size of the stack and parameter area defaults to 1024 bytes for
+OS9/6809.
+
+@item -os9-name=modname
+Set the name of the OS-9 module to @code{modname}. Otherwise it defaults
+to the name of the output file or may be specified in the code, labeled
+by the symbol @code{__modname}.
+
+@item -os9-ns
+Declare the OS-9 module as non-shareable and non-reentrant. It resets
+the shareable-flag in the module header, which is set otherwise.
+
+@item -os9-rev=val
+Set the revision in the OS-9 module header to @code{val}. Must be a value
+beteen 0 and 15. Defaults to zero.
+
 @item -P symbol
 Protect a symbol from stripping. This doesn't work for all targets!
 
@@ -582,11 +648,11 @@ Merge all data and bss sections to a single data-bss section (small data).
 
 @item -set-adduscore
 Start adding a preceding underscore for the symbols of the
-following objects in the command line.
+following objects on the command line.
 
 @item -set-deluscore
 Start deleting a preceding underscore for the symbols of the
-following objects in the command line.
+following objects on the command line.
 
 @item -shared
 Instructs the linker to build a shared object from the object
@@ -598,51 +664,11 @@ this will create the @code{SONAME} tag in the @code{.dynamic}
 section.
 
 @item -T script
-Specifies a linker script, which defines the absolute
-locations for every section. The command language should be the same
-as that used in GNU linker scripts, although does not implement
-everything yet.
-Supported commands:
-@itemize @minus
-  @item ASSERT
-  @item BYTE
-  @item CONSTRUCTORS
-  @item ENTRY
-  @item EXTERN
-  @item FILL8
-  @item FILL16
-  @item GROUP
-  @item INPUT
-  @item LONG
-  @item OUTPUT_ARCH
-  @item OUTPUT_FORMAT
-  @item PROVIDE
-  @item QUAD
-  @item RESERVE
-  @item SEARCH_DIR
-  @item SHORT
-  @item SQUAD
-  @item VBCC_CONSTRUCTORS
-  @item VBCC_CONSTRUCTORS_ELF
-@end itemize
-Supported functions:
-@itemize @minus
-  @item ADDR
-  @item ALIGN
-  @item KEEP
-  @item LOADADDR
-  @item MAX
-  @item MIN
-  @item SIZEOF
-  @item SIZEOF_HEADERS
-  @item SORT
-@end itemize
-You find the full documentation for GNU linker scripts here:
-@uref{https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts, Linker Scripts}
-@code{RESERVE(n)} is vlink-specific and reserves @code{n} bytes in a
-section, which are filled with the value given by @code{FILL8()} or
-@code{FILL16()} (defaults to zero). Also note that @code{FILL()} does not
-exist, but was replaced by the aforementioned commands.
+Specifies a linker script, which defines the mapping of input
+sections and their absolute locations in memory.
+The command language used is meant to be nearly identical to that
+used in GNU linker scripts, although not everything is implemented
+and there are a few additional commands. @xref{Linker Scripts}.
 
 @item -Ttext addr
 Set the base address of the first section. It can be overridden by
@@ -689,10 +715,6 @@ Writes text-based (offset to program start) DRI symbols to a TOS executable,
 like Devpac. Otherwise symbol offsets are based on the section they are
 defined in.
 
-@item -Ttext addr
-Sets the start address of the first section, as long as it is not
-overwritten by a linker script.
-
 @item -u symbol
 Marks symbol as undefined in the first section which was
 found on the command line. This might trigger linking of
@@ -729,6 +751,292 @@ by the difference between the section's real size and file size (for
 those file formats which support it).
 @end table
 
+
+@node Linker Scripts
+@chapter Linker Scripts
+
+@node Memory
+@section Memory Layout
+By default sections may be allocated in all available memory. You
+can define specific memory regions by using the @code{MEMORY} command.
+The syntax is:
+
+@example
+MEMORY @{
+  memblockname (attr) : ORIGIN = org, LENGTH = len
+  ...
+@}
+@end example
+
+Defines one of more memory regions with start address @code{org} and a
+length of @code{len} bytes. The attributes in @code{(attr)} are optional
+and will be ignored by vlink, when specified (just for compatibility, at
+the moment). The keywords @code{ORIGIN} and @code{LENGTH} may be
+abbreviated down to a single character (@code{o=} and @code{l=}).
+Once a memory region is defined as @code{memblockname} the output of
+sections can be redirected into it by appending @code{>memblockname} at
+the end of a section definition.
+
+@section Output Sections
+@example
+SECTIONS @{
+  ...
+@}
+@end example
+This is the only mandatory block in each linker script and is used to
+define the mapping of input sections to output sections, as well as
+their location in memory.
+
+Within this block there may be symbol assignments, also for the location
+counter (@code{.}), commands and output section definitions.
+
+A symbol assignment looks like
+@example
+symbol = expression;
+@end example
+where @code{expression} may contain the usual arithmetic operations,
+other symbols and functions (@xref{Functions}). The special symbol
+@code{.} (dot) is the location counter and defines the current address
+(VMA) in memory where the following sections and data are placed.
+
+All valid linker-script commands are described here: @xref{Commands}.
+
+An output section definition has many optional attributes and looks like
+this in its complete form:
+@example
+secname vma (type) : AT(lma) @{
+  file/section-patterns and commands
+  ...
+@} >region AT>lma-region :phdr =fill
+@end example
+Mandatory are only @code{secname}, the colon and the curly-braces.
+Everything else is optional.
+@table @code
+@item secname
+  Name of the output section to create at the address of the current
+  location counter.
+@item vma
+  When given, defines the section's start address (VMA) as @code{vma}
+  and also redefines the location counter.
+@item (type)
+  Optional. The only valid @code{type} in vlink is @code{NOLOAD}, which
+  avoids writing the section's contents into the output file. Usually
+  this makes sense for uninitialized sections, like BSS.
+@item AT(lma)
+  Optionally sets the load-address (LMA) of the section to @code{lma}.
+  Useful for initialized data loaded into ROM, which is copied to its
+  real address in RAM during startup.
+@item >region
+  Optionally redirects this output section into memory region @code{region}
+  (defined by the @code{MEMORY} command, @xref{Memory}).
+  Each memory region has its own location counter!
+@item AT>lma-region
+  Optionally load this output section into memory region @code{lma-region}
+  (defined by the @code{MEMORY} command, @xref{Memory}).
+  Each memory region has its own location counter!
+@item :phdr
+  Defines that the output section should go into program segment @code{phdr}.
+  PHDR segments are used in ELF executables and in vlink's @code{rawseg}
+  output target. Optional. Uses the last @code{phdr} when omitted.
+@item =fill
+  @code{fill} optionally defines a 16-bit pattern used to fill skipped
+  or undefined regions in the output section (refer to @code{FILL16}).
+@end table
+
+Between the curly-braces there may be linker-script commands
+(@xref{Commands}), symbol assignments and one or multiple input section
+specifications. An input section specification consists of a 
+single file-pattern and one or multiple section-patterns, which looks like:
+@code{fpat(spat1 spat2...)}.
+
+To match multiple files or sections the usual wildcards may be used for
+file- and section-patterns. The wildcard capabilities depend on the host
+operating system vlink is running on, so do not expect that anything more
+than '@code{*}' (match any string) and '@code{?}' (match any character)
+will work.
+
+The matching input files and their matching input sections will be included
+into the output section at this point.
+
+The following functions are valid when specifying input section patterns:
+@table @code
+@item KEEP(fpat(spat...))
+  Always keep these input sections in the output. Never delete them by any
+  form of garbage collection (e.g. @option{-gc-all} or @option{-gc-empty}).
+@item SORT(fpat)(spat...)
+  Sort the file names to include sections from.
+@item fpat(SORT(spat...))
+  Include matching input sections sorted.
+@end table
+
+@section Program Headers
+@example
+PHDRS @{
+  phdrname type FILEHDR PHDRS AT(addr) FLAGS(flags);
+  ...
+@}
+@end example
+Program headers are also known as segments and mainly used in ELF
+executables. Segments define a block of multiple sections with similar
+attributes (e.g. executable and read-only or read-write). The linker
+defines reasonable default Program Headers, but you may want to overwrite
+the default.
+
+@table @code
+@item phdrname
+  Defines the segment's name, which may be used in
+  an output section definition, using the @code{:phdrname} syntax.
+@item type
+  The segment type may be @code{PT_LOAD}, @code{PT_DYNAMIC}, @code{PT_INTERP},
+  @code{PT_NOTE}, @code{PT_SHLIB} or @code{PT_PHDR}. Refer to the ELF-ABI
+  documentation for a precise description. @code{PT_LOAD} defines a segment
+  which is loaded into memory. @code{PT_PHDR} defines a segment which
+  includes the program header itself.
+@item FILEHDR
+  Set this optional attribute when the segment includes the (ELF)
+  file header information.
+@item PHDRS
+  Set this optional attribute when the segment includes the program
+  header table. Typically set together with @code{FILEHDR}.
+@item AT(addr)
+  Optionally defines the segment's start address to be @code{addr}.
+@item FLAGS(flags)
+  Optionally defines the segment permission as @code{flags}, where bit 0
+  means executable, bit 1 means writable and bit 2 means readable.
+@end table
+
+@node Commands
+@section Commands
+The following commands are currently supported in vlink linker scripts:
+
+@table @code
+
+@item ASSERT(expression,"message")
+  Evaluate @code{expression} and print an assertion error, including the
+  optional @code{message}, when zero.
+
+@item BYTE(expression)
+  Insert a byte at the current section address and assign the value of
+  @code{expression} to it.
+
+@item CONSTRUCTORS
+  Set the constructor/destructor function collection strategy to
+  GNU-style constructors. They are usually already placed into
+  @code{.ctors} and @code{.dtors} sections.
+
+@item ENTRY(symbol)
+  @code{symbol} defines the entry point of program execution, which may
+  be used by some executable file formats. It is also used to define the
+  starting point for section garbage collection (@option{-gc-all} option).
+
+@item EXTERN(symbol [symbol ...])
+  Define one or multiple symbols as undefined, which might trigger
+  linking of additional modules from standard libraries. Refer to
+  option @option{-u}.
+
+@item FILL8(expression)
+  Specify an 8-bit fill-pattern, which is used to fill skipped regions
+  in a section (e.g. by alignments or setting a new location counter).
+
+@item FILL16(expression)
+  Specify a 16-bit fill-pattern, which is used to fill skipped regions
+  in a section (e.g. by alignments or setting a new location counter).
+  The @code{expression} is always written in big-endian order.
+
+@item GROUP(file [file...])
+  For compatibility. Works just like @code{INPUT} in vlink.
+
+@item INPUT(file [file...])
+  Define input files, which has exactly the same effect like on the
+  command line. Specifying libraries needs a @code{-l} prefix. When there
+  are also input files on the command line, the files specified here will
+  be appended.
+
+@item LONG(expression)
+  Insert a 32-bit word the current section address and assign the value of
+  @code{expression}, using the target's endianess, to it.
+
+@item OUTPUT_ARCH()
+@itemx OUTPUT_FORMAT()
+  No meaning in vlink. Just for compatibility. Refer to option @option{-b}
+  to define the output file format.
+
+@item PROVIDE(symbol = expression)
+  The @code{symbol} will only be defined with @code{expression} when it
+  is referenced from anywhere in the input files.
+
+@item QUAD(expression)
+  Insert a 64-bit word the current section address and assign the value of
+  @code{expression}, using the target's endianess, to it.
+
+@item RESERVE(space)
+  Reserve @code{space} bytes at the current location counter, which are
+  filled with the value given by @code{FILL8()} or @code{FILL16()}
+  (defaults to zero).
+
+@item SEARCH_DIR(path)
+  Appends @code{path} as an additional library search path. Has the same
+  effect as @option{-L}.
+
+@item SHORT(expression)
+  Insert a 16-bit word the current section address and assign the value of
+  @code{expression}, using the target's endianess, to it.
+
+@item SQUAD(expression)
+  Insert a 64-bit word the current section address and assign the value of
+  @code{expression}, using the target's endianess, to it.
+
+@item VBCC_CONSTRUCTORS
+  Set the constructor/destructor function collection strategy to
+  vbcc-style constructors (@code{__INIT[_<pri>]_<name> / __EXIT..})
+  and put them into the current section.
+
+@item VBCC_CONSTRUCTORS_ELF
+  Set the constructor/destructor function collection strategy to
+  vbcc-style ELF constructors (@code{_INIT[_<pri>]_<name> / _EXIT..})
+  and put them into the current section.
+
+@end table
+
+@node Functions
+@section Functions
+The following functions are currently supported in vlink linker scripts:
+
+@table @code
+
+@item ADDR(sectionname)
+  Return the address (VMA) of the section named @code{sectionname}.
+
+@item ALIGN(align)
+  Align the location counter (@code{.}) to the next address which is a
+  multiple of @code{align}.
+
+@item LENGTH(memoryname)
+  Return the length of the memory region named @code{memoryname}.
+
+@item LOADADDR(sectionname)
+  Return the loading-address (LMA) of the section named @code{sectionname}.
+
+@item MAX(exp1,exp2)
+  Return the maximum value of the two expressions @code{exp1} and @code{exp2}.
+
+@item MIN(exp1,exp2)
+  Return the minimum value of the two expressions @code{exp1} and @code{exp2}.
+
+@item ORIGIN(memoryname)
+  Return the start address of the memory region named @code{memoryname}.
+
+@item SIZEOF(sectionname)
+  Return the size of the section named @code{sectionname} in bytes.
+
+@item SIZEOF_HEADERS
+  Return the size of the output file format's header in bytes.
+
+@end table
+
+
+@chapter Appendix
+
 @section Known Problems
 @itemize @minus
   @item Neither shared objects nor dynamically linked executables can be
@@ -757,6 +1065,7 @@ alphabetical order, probably not complete):
   @item Miro Kropacek
   @item Jean-Paul Mari
   @item Gunther Nikl
+  @item Thorsten Otto
   @item Keith S
   @item J@"org Strohmayer
 @end itemize
@@ -834,7 +1143,7 @@ alphabetical order, probably not complete):
 @item %s line %d: GNU command <%s> ignored
 @item %s line %d: Unknown memory region <%s>
 @item %s line %d: Multiple constructor types in output file
-@item %s line %d: Syntax error
+@item %s line %d: Unknown keyword <%s>
 @item %s line %d: Assertion failed: %s
 @item %s line %d: SECTIONS block defined twice
 @item %s line %d: Segment %s is closed and can't be reused
@@ -897,6 +1206,8 @@ alphabetical order, probably not complete):
 @item Executable code section in first object required when using -gc-all
 @item Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=0x%llx) in resident data section
 @item %s (%s+0x%x): Absolute reference to resident data section (%s)
+@item %s line %d: Undefined memory region: <%s>
+@item Target %s: multiple %s sections not allowed: <%s> and <%s>
 
 @end enumerate
 

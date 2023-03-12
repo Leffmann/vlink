@@ -48,7 +48,7 @@ struct FFFuncs fff_elf32m68k = {
   0,
   RTAB_ADDEND,RTAB_STANDARD|RTAB_ADDEND,
   _BIG_ENDIAN_,
-  32
+  32,2
 };
 
 

@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.16e (16.05.20)
+/* $VER: vlink main.c V0.16f (28.08.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -140,6 +140,68 @@ static int flavours_cmp(const void *f1,const void *f2)
 }
 
 
+static int tos_options(struct GlobalVars *gv,int argc,const char *argv[],int i)
+{
+  /* -tos-options for targets ataritos and aoutmint */
+  if (!strcmp(&argv[i][5],"flags")) {
+    long fl;
+
+    sscanf(get_arg(argc,argv,&i),"%li",&fl);
+    gv->tosflags = fl;
+  }
+  else if (!strcmp(&argv[i][5],"fastload"))
+    gv->tosflags |= 1;
+  else if (!strcmp(&argv[i][5],"fastram"))
+    gv->tosflags |= 2;
+  else if (!strcmp(&argv[i][5],"fastalloc"))
+    gv->tosflags |= 4;
+  else if (!strcmp(&argv[i][5],"private"))
+    gv->tosflags &= ~0x30;
+  else if (!strcmp(&argv[i][5],"global"))
+    gv->tosflags |= 0x10;
+  else if (!strcmp(&argv[i][5],"super"))
+    gv->tosflags |= 0x20;
+  else if (!strcmp(&argv[i][5],"readable"))
+    gv->tosflags |= 0x30;
+  else if (!strcmp(&argv[i][5],"textbased"))
+    gv->textbasedsyms = 1;
+  else
+    error(2,argv[i]);  /* unrecognized option */
+  return i;
+}
+
+
+static int os9_options(struct GlobalVars *gv,int argc,const char *argv[],int i)
+{
+  /* OS-9 specific options */
+  if (!strncmp(&argv[i][5],"mem=",4)) {
+    int last = strlen(argv[i]) - 1;
+    long mem;
+
+    sscanf(&argv[i][9],"%li",&mem);
+    if (argv[i][last]=='k' || argv[i][last]=='K')
+      mem <<= 2;  /* value is in KBytes instead of pages */
+    gv->os9mem = mem>0 ? mem : 1;
+  }
+  else if (!strncmp(&argv[i][5],"name=",5)) {
+    gv->os9name = &argv[i][10];
+  }
+  else if (!strcmp(&argv[i][5],"ns")) {
+    gv->os9noshare = TRUE;
+  }
+  else if (!strncmp(&argv[i][5],"rev=",4)) {
+    long rev;
+
+    sscanf(&argv[i][9],"%li",&rev);
+    if (rev<0 || rev>15)
+      error(130,argv[i]);  /* bad assignment */
+    else
+      gv->os9rev = rev;
+  }
+  return i;
+}
+
+
 void cleanup(struct GlobalVars *gv)
 {
   exit(gv->returncode);
@@ -169,7 +231,7 @@ int main(int argc,const char *argv[])
   /* initialize targets */
   for (j=0; fff[j]; j++) {
     if (fff[j]->init)
-      fff[j]->init(gv);
+      fff[j]->init(gv,FFINI_STARTUP);  /* startup-init for all targets */
   }
 #ifdef DEFTARGET
   for (j=0; fff[j]; j++) {
@@ -333,7 +395,12 @@ int main(int argc,const char *argv[])
           break;
 
         case 'm':
-          if (!strcmp(&argv[i][2],"inalign")) {
+          if (!argv[i][2]) {
+            gv->masked_symbols = '.';
+            if (gv->symmasks == NULL)
+              gv->symmasks = alloc_hashtable(SMASKHTABSIZE);
+          }
+          else if (!strcmp(&argv[i][2],"inalign")) {
             long a;
 
             sscanf(get_arg(argc,argv,&i),"%li",&a);
@@ -368,6 +435,8 @@ int main(int argc,const char *argv[])
           }
           else if (!strcmp(&argv[i][2],"sec"))
             gv->output_sections = TRUE;  /* output each section as a file */
+          else if (!strncmp(&argv[i][2],"s9-",3))
+            i = os9_options(gv,argc,argv,i);
           else
             gv->dest_name = get_option_arg(argc,argv,&i);
           break;
@@ -435,33 +504,8 @@ int main(int argc,const char *argv[])
         case 't':  /* trace file accesses */
           if (!strcmp(&argv[i][2],"extbaserel"))
             gv->textbaserel = TRUE;
-          else if (!strncmp(&argv[i][2],"os-",3)) {
-            /* -tos-options for targets ataritos and aoutmint */
-            if (!strcmp(&argv[i][5],"flags")) {
-              long fl;
-
-              sscanf(get_arg(argc,argv,&i),"%li",&fl);
-              gv->tosflags = fl;
-            }
-            else if (!strcmp(&argv[i][5],"fastload"))
-              gv->tosflags |= 1;
-            else if (!strcmp(&argv[i][5],"fastram"))
-              gv->tosflags |= 2;
-            else if (!strcmp(&argv[i][5],"fastalloc"))
-              gv->tosflags |= 4;
-            else if (!strcmp(&argv[i][5],"private"))
-              gv->tosflags &= ~0x30;
-            else if (!strcmp(&argv[i][5],"global"))
-              gv->tosflags |= 0x10;
-            else if (!strcmp(&argv[i][5],"super"))
-              gv->tosflags |= 0x20;
-            else if (!strcmp(&argv[i][5],"readable"))
-              gv->tosflags |= 0x30;
-            else if (!strcmp(&argv[i][5],"textbased"))
-              gv->textbasedsyms = 1;
-            else
-              error(2,argv[i]);  /* unrecognized option */
-          }
+          else if (!strncmp(&argv[i][2],"os-",3))
+            i = tos_options(gv,argc,argv,i);
           else if (!argv[i][2])
             gv->trace_file = stderr;
           else
@@ -539,7 +583,10 @@ int main(int argc,const char *argv[])
 
         case 'C':  /* select con-/destructor type */
           if (buf = get_option_arg(argc,argv,&i)) {
-            if (!strcmp(buf,"gnu")) {
+            if (!strcmp(buf,"rel")) {
+              gv->pcrel_ctors = TRUE;
+            }
+            else if (!strcmp(buf,"gnu")) {
               gv->collect_ctors_type = CCDT_GNU;
             }
             else if (!strcmp(buf,"vbcc")) {

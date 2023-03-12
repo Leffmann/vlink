@@ -1,4 +1,4 @@
-# Standard Unix
+# Standard Unix with gcc
 
 TARGET = vlink
 DIR = objects
@@ -6,10 +6,10 @@ MD = mkdir
 
 CC = gcc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "
-COPTS = -std=c9x -O2 -fomit-frame-pointer -c
+COPTS = -std=c99 -Wpedantic -O2 -fomit-frame-pointer -c
 CONFIG =
 
-LD = gcc
+LD = $(CC)
 LDOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "
 LDOPTS =
 LIBS =

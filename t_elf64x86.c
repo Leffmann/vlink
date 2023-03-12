@@ -48,7 +48,7 @@ struct FFFuncs fff_elf64x86 = {
   0,
   RTAB_ADDEND,RTAB_STANDARD|RTAB_ADDEND,
   _LITTLE_ENDIAN_,
-  64
+  64,0
 };
 
 
@@ -134,7 +134,6 @@ static struct Symbol *x86_64_dynentry(struct GlobalVars *gv,DynArg a,int etype)
 {
   struct Symbol *entry_sym = NULL;
   struct Section *sec;
-  char *bssname;
 
   switch (etype) {
 

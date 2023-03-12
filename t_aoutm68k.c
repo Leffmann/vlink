@@ -119,7 +119,7 @@ struct FFFuncs fff_aoutbsd68k = {
   MID_M68K,
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR
 };
 #endif
@@ -151,7 +151,7 @@ struct FFFuncs fff_aoutbsd68k4k = {
   MID_M68K4K,
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR
 };
 #endif
@@ -183,7 +183,7 @@ struct FFFuncs fff_aoutsun010 = {
   MID_SUN010,
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR
 };
 #endif
@@ -215,7 +215,7 @@ struct FFFuncs fff_aoutsun020 = {
   MID_SUN020,
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,2,
   FFF_BASEINCR
 };
 #endif
@@ -277,7 +277,7 @@ struct FFFuncs fff_aoutjaguar = {
   0,  /* MID 0! */
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR|AOUT_JAGRELOC
 };
 #endif

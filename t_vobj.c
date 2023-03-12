@@ -99,7 +99,8 @@ struct FFFuncs fff_vobj_le = {
   0,
   RTAB_UNDEF,0,
   _LITTLE_ENDIAN_,
-  0  /* defined by VOBJ bytespertaddr*8 */
+  0,  /* defined by VOBJ bytespertaddr*8 */
+  0   /* irrelevant - no output format */
 };
 
 struct FFFuncs fff_vobj_be = {
@@ -126,7 +127,8 @@ struct FFFuncs fff_vobj_be = {
   0,
   RTAB_UNDEF,0,
   _BIG_ENDIAN_,
-  0  /* defined by VOBJ bytespertaddr*8 */
+  0,  /* defined by VOBJ bytespertaddr*8 */
+  0   /* irrelevant - no output format */
 };
 
 

@@ -163,7 +163,7 @@ static size_t filesize(FILE *fp,const char *name)
         if (fseek(fp,oldpos,SEEK_SET) >= 0)
           return (size_t)size;
   fclose(fp);
-  error(5,name);  /* read error - doesn't return */
+  error(7,name);  /* read error - doesn't return */
   return 0;
 }
 
@@ -202,7 +202,7 @@ const char *base_name(const char *s)
 
   while (l--) {
     c = s[l];
-    if (c== '/' || c==':')
+    if (c=='/' || c=='\\' || c==':')
       return &s[l+1];
   }
   return s;

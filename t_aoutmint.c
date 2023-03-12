@@ -75,7 +75,7 @@ struct FFFuncs fff_aoutmint = {
   0,  /* MiNT uses MID 0 */
   RTAB_STANDARD,RTAB_STANDARD,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_BASEINCR
 };
 

@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.16e (13.06.20)
+/* $VER: vlink linker.c V0.16f (28.08.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -834,7 +834,7 @@ static void ref_prot_symbols(struct GlobalVars *gv)
 
   /* find global protected symbols */
   for (sn=gv->prot_syms; sn!=NULL; sn=sn->next) {
-    if (psym = findsymbol(gv,NULL,sn->name))
+    if (psym = findsymbol(gv,NULL,sn->name,0))
       ref_section(psym->relsect);
   }
 
@@ -927,6 +927,7 @@ void linker_init(struct GlobalVars *gv)
   initlist(&gv->scriptsymbols);
   gv->got_base_name = gotbase_name;
   gv->plt_base_name = pltbase_name;
+  gv->ptr_alignment = fff[gv->dest_format]->ptr_alignment;
 
   if (gv->reloctab_format != RTAB_UNDEF) {
     if (!(fff[gv->dest_format]->rtab_mask & gv->reloctab_format)) {
@@ -936,6 +937,10 @@ void linker_init(struct GlobalVars *gv)
   }
   else
     gv->reloctab_format = fff[gv->dest_format]->rtab_format;
+
+  /* init destination format */
+  if (fff[gv->dest_format]->init != NULL)
+    fff[gv->dest_format]->init(gv,FFINI_DESTFMT);
 }
 
 
@@ -1053,7 +1058,7 @@ void linker_resolve(struct GlobalVars *gv)
 /* Resolve all symbol references and pull the required objects into */
 /* the gv->selobjects list. */
 {
-  bool constructors_made = FALSE;
+  bool last_actions_done = FALSE;
   bool pseudo_dynlink = (fff[gv->dest_format]->flags&FFF_PSEUDO_DYNLINK)!=0;
   struct ObjectUnit *obj = (struct ObjectUnit *)gv->selobjects.first;
   static const char *pulltxt = " needed due to ";
@@ -1076,6 +1081,7 @@ void linker_resolve(struct GlobalVars *gv)
     struct Reloc *xref;
     struct Symbol *xdef;
     struct ObjectUnit *pull_unit;
+    uint32_t cmask;
 
     /* all sections of this object are checked for external references */
     for (sec=(struct Section *)obj->sections.first;
@@ -1083,6 +1089,15 @@ void linker_resolve(struct GlobalVars *gv)
 
       for (xref=(struct Reloc *)sec->xrefs.first;
            xref->n.next!=NULL; xref=(struct Reloc *)xref->n.next) {
+
+        /* remember common mask, when set */
+        if (xref->flags & RELF_MASKED)
+          cmask = xref->relocsect.smask->common_mask;
+        else
+          cmask = 0;
+
+        /* preset as unresolved; warning: union! resets also smask, id, etc. */
+        xref->relocsect.symbol = NULL;
 
         if (xref->rtype == R_LOADREL) {
           /* addend offsets to load address, nothing to resolve */
@@ -1096,7 +1111,7 @@ void linker_resolve(struct GlobalVars *gv)
         }
 
         /* find a global symbol with this name in any object or library */
-        xdef = findsymbol(gv,sec,xref->xrefname);
+        xdef = findsymbol(gv,sec,xref->xrefname,cmask);
 
         if (xdef!=NULL && xref->rtype==R_LOCALPC) {
           /* R_LOCALPC only accepts symbols which are defined in the
@@ -1263,9 +1278,11 @@ void linker_resolve(struct GlobalVars *gv)
       }
     }
 
-    if (obj->n.next->next == NULL && !constructors_made) {
+    if (obj->n.next->next == NULL && !last_actions_done) {
+      if (fff[gv->dest_format]->init != NULL)
+        fff[gv->dest_format]->init(gv,FFINI_RESOLVE);
       make_constructors(gv);  /* Con-/Destructor object always at last */
-      constructors_made = TRUE;
+      last_actions_done = TRUE;
     }
     obj = (struct ObjectUnit *)obj->n.next;
   }
@@ -1985,11 +2002,12 @@ void linker_copy(struct GlobalVars *gv)
     }
   }
 
+  if (gv->map_file)
+    fprintf(gv->map_file,"\nLinker symbols:\n");
+
   if (gv->use_ldscript && maxls!=NULL) {
     /* put remaining absolute linker script symbols into the
        symbol list of the largest defined section: */
-    if (gv->map_file)
-      fprintf(gv->map_file,"\nLinker symbols:\n");
     while (sym = (struct Symbol *)remhead(&gv->scriptsymbols)) {
       if (!((sym->flags & (SYMF_REFERENCED|SYMF_PROVIDED))
             == SYMF_PROVIDED)) {
@@ -2460,55 +2478,7 @@ void linker_relocate(struct GlobalVars *gv)
 
 void linker_write(struct GlobalVars *gv)
 {
-  struct LinkedSection *ls = (struct LinkedSection *)gv->lnksec.first;
-  struct LinkedSection *firstls=NULL,*nextls;
   FILE *f;
-
-#if OBSOLETE /* replaced by gc_sects and linker_delunused() */
-  /* remove empty sections without referenced symbols and relocs */
-  gv->nsecs = 0;
-  while (nextls = (struct LinkedSection *)ls->n.next) {
-    if (firstls == NULL)
-      firstls = ls;
-
-    if (ls->size==0 && listempty(&ls->relocs)
-        && !(ls->ld_flags & LSF_PRESERVE)) {
-      struct Symbol *sym;
-      int keep = 0;
-
-      for (sym=(struct Symbol *)ls->symbols.first;
-           sym->n.next!=NULL; sym=(struct Symbol *)sym->n.next) {
-        if (!discard_symbol(gv,sym) ||
-            (sym->type!=SYM_ABS && (sym->flags & SYMF_REFERENCED)!=0))
-          keep = 1;
-      }
-      if (!keep) {
-        remnode(&ls->n);
-        if (ls == firstls)
-          firstls = NULL;
-        ls = nextls;
-        continue;
-      }
-      else if (ls!=firstls && is_common_ls(gv,ls)) {
-        /* @@@ Attention! This is a big HACK!
-           For the future it should be desirable to have a separate
-           list for common symbols, instead of just putting them into
-           the symbol list of the first section... @@@ */
-        struct Symbol *sym;
-
-        while (sym = (struct Symbol *)remhead(&ls->symbols)) {
-          addtail(&firstls->symbols,&sym->n);
-        }
-        remnode(&ls->n);
-        ls = nextls;
-        continue;
-      }
-    }
-
-    ls->index = gv->nsecs++;  /* reindex remaining sections */
-    ls = nextls;
-  }
-#endif /* OBSOLETE */
 
   if (!gv->errflag) {  /* no error? */
     if (gv->trace_file) {
@@ -2522,7 +2492,7 @@ void linker_write(struct GlobalVars *gv)
     }
 
     /* create output file */
-    if (!gv->output_sections) {
+    if (!gv->output_sections && !(fff[gv->dest_format]->flags&FFF_NOFILE)) {
       if ((f = fopen(gv->dest_name,"wb")) == NULL) {
         error(29,gv->dest_name);  /* Can't create output file */
         return;
@@ -2530,7 +2500,7 @@ void linker_write(struct GlobalVars *gv)
     }
     else {
       f = NULL;
-      if (!(fff[gv->dest_format]->flags & FFF_SECTOUT)) {
+      if (gv->output_sections && !(fff[gv->dest_format]->flags&FFF_SECTOUT)) {
         error(29,"with sections");  /* Can't create output file with sect. */
         return;
       }

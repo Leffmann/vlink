@@ -1,8 +1,8 @@
-/* $VER: vlink expr.c V0.14a (20.07.12)
+/* $VER: vlink expr.c V0.16f (21.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2012  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -98,7 +98,7 @@ char *getarg(uint8_t mask)
 /* table of valid characters, */
 /* 0=invalid, 1=valid in whole word, 2=valid, but not as first char */
 /* 4=symbols for pattern-matching, 11(+16)=valid for file names */
-  static uint8_t validchars[256] = {
+  static const uint8_t validchars[256] = {
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,8,0,0,0,8,0,0,0,0,4,8,0,8,1,12, /* * . / */
@@ -127,12 +127,12 @@ char *getarg(uint8_t mask)
     if (bp >= &buffer[MAXLEN-1])
       break;  /* buffer overflow */
   }
+
+  if (bp == buffer)
+    return NULL;  /* no valid character in buffer, preserve old buffer */
+
   *bp = '\0';
-
-  if (buffer[0])
-    return buffer;
-
-  return NULL;  /* no valid word read */
+  return buffer;
 }
 
 
@@ -255,7 +255,7 @@ static struct Expr *primary_expr(void)
       else {  /* otherwise it's possibly a function- or symbol-name */
         struct Symbol *sym;
 
-        if (sym = findsymbol(gv,NULL,word)) {
+        if (sym = findsymbol(gv,NULL,word,0)) {
           if (caddr==-1 && sym->type!=SYM_ABS) {
             /* Reference to non-absolute symbol */
             error(102,scriptname,line,sym->name);

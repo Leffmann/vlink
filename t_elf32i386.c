@@ -51,7 +51,7 @@ struct FFFuncs fff_elf32i386 = {
   0,
   RTAB_STANDARD,RTAB_STANDARD|RTAB_ADDEND,
   _LITTLE_ENDIAN_,
-  32
+  32,0
 };
 #endif  /* ELF32_386 */
 
@@ -90,7 +90,7 @@ struct FFFuncs fff_elf32aros = {
   0,
   RTAB_STANDARD,RTAB_STANDARD|RTAB_ADDEND,
   _LITTLE_ENDIAN_,
-  32
+  32,0
 };
 
 
@@ -178,7 +178,6 @@ static struct Symbol *i386_dynentry(struct GlobalVars *gv,DynArg a,int etype)
 {
   struct Symbol *entry_sym = NULL;
   struct Section *sec;
-  char *bssname;
 
   switch (etype) {
 

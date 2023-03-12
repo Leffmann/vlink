@@ -1,4 +1,4 @@
-/* $VER: vlink t_amigahunk.c V0.16d (30.03.20)
+/* $VER: vlink t_amigahunk.c V0.16f (08.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -13,7 +13,7 @@
 #include "amigahunks.h"
 
 
-static void init(struct GlobalVars *);
+static void init(struct GlobalVars *,int);
 static int ados_identify(char*,uint8_t *,unsigned long,bool);
 static int ehf_identify(char *,uint8_t *,unsigned long,bool);
 static int identify(char *,uint8_t *,unsigned long,bool);
@@ -25,7 +25,7 @@ static struct Symbol *ados_lnksym(struct GlobalVars *,struct Section *,
                                   struct Reloc *);
 static void ados_setlnksym(struct GlobalVars *,struct Symbol *);
 static struct Symbol *ehf_findsymbol(struct GlobalVars *,
-                                     struct Section *,const char *);
+                                     struct Section *,const char *,uint32_t);
 static struct Symbol *ehf_lnksym(struct GlobalVars *,struct Section *,
                                   struct Reloc *);
 static void ehf_setlnksym(struct GlobalVars *,struct Symbol *);
@@ -59,7 +59,7 @@ struct FFFuncs fff_amigahunk = {
   0,
   RTAB_STANDARD,RTAB_STANDARD|RTAB_SHORTOFF,
   _BIG_ENDIAN_,
-  32,
+  32,1,
   FFF_RELOCATABLE
 };
 
@@ -87,7 +87,7 @@ struct FFFuncs fff_ehf = {
   0,
   RTAB_STANDARD,RTAB_STANDARD|RTAB_SHORTOFF,
   _BIG_ENDIAN_,
-  32,
+  32,2,
   FFF_RELOCATABLE
 };
 
@@ -127,10 +127,12 @@ static int *rcnt,rrcnt;
 
 
 
-static void init(struct GlobalVars *gv)
+static void init(struct GlobalVars *gv,int mode)
 {
-  merged_hash = elf_hash(merged_name);
-  nomerge_hash = elf_hash(nomerge_name);
+  if (mode == FFINI_STARTUP) {
+    merged_hash = elf_hash(merged_name);
+    nomerge_hash = elf_hash(nomerge_name);
+  }
 }
 
 
@@ -365,7 +367,7 @@ static void skipindex(struct HunkInfo *hi,uint32_t off)
 
 const char *readstrpool(struct HunkInfo *hi)
 {
-  return allocstring(hi->indexbase + 2 + readindex(hi));
+  return allocstring((char *)hi->indexbase + 2 + readindex(hi));
 }
 
 
@@ -440,6 +442,8 @@ static bool addlongrelocs(struct GlobalVars *gv,struct HunkInfo *hi,
         offs = nextword32(hi);
         r = newreloc(gv,s,NULL,NULL,id,offs,type,
                      readsection(gv,type,s->data+offs,&ri));
+        if (type == R_SD)
+          r->addend &= makemask(size);  /* SD-addends must be unsigned! */
         addreloc_ri(s,r,&ri);
       }
     }
@@ -1331,36 +1335,62 @@ static void ados_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
 }
 
 
-static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,
-                                     struct Section *sec,const char *name)
+static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
+                                     const char *name,uint32_t mask)
 {
-  struct Symbol *sym = gv->symbols[elf_hash(name)%SYMHTABSIZE];
-  struct Symbol *second_choice = NULL;
+  struct Symbol *sym,*second_choice,*found;
+  uint32_t minmask = ~0;
 
-  while (sym) {
+  for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],second_choice=NULL,found=NULL;
+       sym!=NULL; sym=sym->glob_chain) {
     if (!strcmp(name,sym->name)) {
-      if (second_choice == NULL)
-        second_choice = sym;
+      if (mask) {
+        /* find a symbol with the best-matching (minimal) feature-mask */
+        uint32_t fmask;
 
-      if (sec!=NULL && sym->type==SYM_RELOC) {
-        /* we prefer symbols from a section which has the same CPU-flags
-           as the caller's section */
-        if ((sec->flags & SF_EHFPPC) == (sym->relsect->flags & SF_EHFPPC))
+        if (fmask = sym->fmask) {
+          if ((mask & fmask) != mask)
+            continue;
+          if (fmask <= minmask)
+            minmask = 0/*fmask*/;
+          else
+            continue;
+        }
+        else if (minmask != ~0)
+          continue;
+
+        second_choice = sym;
+        if (sec!=NULL && sym->type==SYM_RELOC) {
+          /* we prefer symbols from a section which has the same CPU-flags
+             as the caller's section */
+          if ((sec->flags & SF_EHFPPC) == (sym->relsect->flags & SF_EHFPPC))
+            found = sym;
+        }
+        else
+          found = sym;
+      }
+      else { /* standard */
+        if (second_choice == NULL)
+          second_choice = sym;
+        found = sym;
+        if (sec!=NULL && sym->type==SYM_RELOC) {
+          /* we prefer symbols from a section which has the same CPU-flags
+             as the caller's section */
+          if ((sec->flags & SF_EHFPPC) == (sym->relsect->flags & SF_EHFPPC))
+            break;
+        }
+        else
           break;
       }
-      else
-        break;
     }
-    sym = sym->glob_chain;
   }
 
   /* accept symbol from a section for a different CPU, if it's the only one */
-  if (!sym && second_choice)
+  if (!(sym=found) && second_choice)
     sym = second_choice;
 
-  if (sym)
-    if (sym->type == SYM_INDIR)
-      return ehf_findsymbol(gv,sec,sym->indir_name);
+  if (sym!=NULL && sym->type==SYM_INDIR)
+      return ehf_findsymbol(gv,sec,sym->indir_name,mask);
 
   return sym;
 }
@@ -1390,7 +1420,7 @@ static struct Symbol *ehf_lnksym(struct GlobalVars *gv,struct Section *sec,
         sprintf(objname,"%s.o",symname);
         ou = art_objunit(gv,objname,dat,sizeof(uint32_t));
         s = add_section(ou,tocd_name,dat,sizeof(uint32_t),ST_DATA,
-                        SF_ALLOC,SP_READ|SP_WRITE,2,FALSE);
+                        SF_ALLOC,SP_READ|SP_WRITE,gv->ptr_alignment,FALSE);
         if (sao = getsecattrovr(gv,tocd_name,SAO_MEMFLAGS))
           s->memattr = sao->memflags;
 
@@ -1405,7 +1435,7 @@ static struct Symbol *ehf_lnksym(struct GlobalVars *gv,struct Section *sec,
           ierror("ehf_lnksym(): %s was assumed to be undefined, but "
                  "in reality it *is* defined",xref->xrefname);
 
-        if (!(sym = findsymbol(gv,sec,xref->xrefname)))
+        if (!(sym = findsymbol(gv,sec,xref->xrefname,0)))
           ierror("ehf_lnksym(): The just defined symbol %s has "
                  "disappeared",xref->xrefname);
         return sym;

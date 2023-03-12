@@ -51,7 +51,7 @@ struct FFFuncs fff_elf32ppcbe = {
   0,
   RTAB_ADDEND,RTAB_ADDEND,
   _BIG_ENDIAN_,
-  32
+  32,2
 };
 #endif
 
@@ -90,7 +90,7 @@ struct FFFuncs fff_elf32powerup = {
   0,
   RTAB_ADDEND,RTAB_ADDEND,
   _BIG_ENDIAN_,
-  32,
+  32,2,
   FFF_RELOCATABLE|FFF_PSEUDO_DYNLINK
 };
 
@@ -118,7 +118,7 @@ struct FFFuncs fff_elf32morphos = {
   0,
   RTAB_ADDEND,RTAB_ADDEND,
   _BIG_ENDIAN_,
-  32,
+  32,2,
   FFF_RELOCATABLE
 };
 
@@ -148,7 +148,7 @@ struct FFFuncs fff_elf32amigaos = {
   0,
   RTAB_ADDEND,RTAB_ADDEND,
   _BIG_ENDIAN_,
-  32,
+  32,2,
   FFF_DYN_RESOLVE_ALL
 };
 

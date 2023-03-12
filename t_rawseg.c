@@ -65,8 +65,8 @@ struct FFFuncs fff_rawseg = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
-  0   /* addr_bits from input */
+  -1,   /* endianess undefined, only write */
+  0,0   /* addr_bits from input */
 };
 #endif
 
@@ -195,7 +195,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
               }
               /* use segment's base address for relocation instead */
               if (relph) {
-                lword segoffs,a,v;
+                lword segoffs,v;
                 struct SegReloc *newsr,*srp;
 
                 segoffs = (lword)relsec->copybase - relph->start;

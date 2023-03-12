@@ -1,8 +1,8 @@
-/* $VER: vlink config.h V0.16c (10.03.19)
+/* $VER: vlink config.h V0.16f (26.07.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2019  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 #ifndef CONFIG_H
@@ -44,6 +44,7 @@
 #define EHF                 /* WarpOS PPC extended hunk format */
 #define ATARI_TOS           /* Atari-ST TOS format */
 #define XFILE               /* Sharp X68000 Human68k XFile format */
+#define OS_9                /* OS-9 6809 reentrant modules */
 
 #define ELF32               /* general 32-bit ELF support */
 #define ELF32_PPC_BE        /* ELF PowerPC 32-Bit Big Endian */
@@ -71,7 +72,11 @@
 #define RAWBIN1             /* single raw binary file */
 #define RAWBIN2             /* multiple raw binary files */
 #define AMSDOS              /* Amstrad/Schneider CPC program */
+#define APPLEBIN            /* Apple DOS 3.3 binary file */
+#define ATARICOM            /* Atari DOS COM format */
 #define CBMPRG              /* Commodore PET, VIC-20, 64, etc. program */
+#define COCOML              /* Tandy Color Computer machine lang. file */
+#define DRAGONBIN           /* Dragon DOS binary format */
 #define JAGSRV              /* Jaguar Server (SkunkBoard, VirtualJaguar) */
 #define SREC19              /* Motorola S-Record 16-bit addresses */
 #define SREC28              /* Motorola S-Record 24-bit addresses */

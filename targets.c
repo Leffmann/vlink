@@ -1,8 +1,8 @@
-/* $VER: vlink targets.c V0.16d (16.10.19)
+/* $VER: vlink targets.c V0.16f (02.09.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2019  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -22,6 +22,9 @@ struct FFFuncs *fff[] = {
 #endif
 #ifdef XFILE
   &fff_xfile,
+#endif
+#ifdef OS_9
+  &fff_os9_6809,
 #endif
 #ifdef ELF32_PPC_BE
   &fff_elf32ppcbe,
@@ -91,8 +94,21 @@ struct FFFuncs *fff[] = {
 #ifdef AMSDOS
   &fff_amsdos,
 #endif
+#ifdef APPLEBIN
+  &fff_applebin,
+#endif
+#ifdef ATARICOM
+  &fff_ataricom,
+#endif
 #ifdef CBMPRG
   &fff_cbmprg,
+  &fff_cbmreu,
+#endif
+#ifdef COCOML
+  &fff_cocoml,
+#endif
+#ifdef DRAGONBIN
+  &fff_dragonbin,
 #endif
 #ifdef JAGSRV
   &fff_jagsrv,
@@ -178,31 +194,45 @@ struct SecRename *secrenames;
 
 
 struct Symbol *findsymbol(struct GlobalVars *gv,struct Section *sec,
-                          const char *name)
+                          const char *name,uint32_t mask)
 /* Return pointer to Symbol, otherwise return NULL.
    Make sure to prefer symbols from sec's ObjectUnit. */
 {
   if (fff[gv->dest_format]->fndsymbol) {
-    return fff[gv->dest_format]->fndsymbol(gv,sec,name);
+    return fff[gv->dest_format]->fndsymbol(gv,sec,name,mask);
   }
   else {
-    struct Symbol *sym = gv->symbols[elf_hash(name)%SYMHTABSIZE];
-    struct Symbol *found = NULL;
+    struct Symbol *sym,*found;
+    uint32_t minmask = ~0;
 
-    while (sym) {
+    for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],found=NULL; sym!=NULL;
+         sym=sym->glob_chain) {
       if (!strcmp(name,sym->name)) {
-        if (found && sec) {
-          /* ignore, when not from the refering ObjectUnit */
-          if (sym->relsect->obj == sec->obj)
-            found = sym;
+        if (mask) {
+          /* find a symbol with the best-matching (minimal) feature-mask */
+          uint32_t fmask;
+
+          if (fmask = sym->fmask) {
+            if ((mask & fmask) != mask)
+              continue;
+            if (fmask <= minmask)
+              minmask = 0/*fmask*/;
+            else
+              continue;
+          }
+          else if (minmask != ~0)
+            continue;
         }
-        else
-          found = sym;
+        else if (found && sec) {
+          /* ignore, when not from the refering ObjectUnit */
+          if (sym->relsect->obj != sec->obj)
+            continue;
+        }
+        found = sym;
       }
-      sym = sym->glob_chain;
     }
     if (found!=NULL && found->type==SYM_INDIR)
-      return findsymbol(gv,sec,found->indir_name);
+      return findsymbol(gv,sec,found->indir_name,mask);
     return found;
   }
   return NULL;
@@ -415,10 +445,29 @@ struct Symbol *addsymbol(struct GlobalVars *gv,struct Section *s,
 /* return a pointer to its first definition. Defining the symbol twice */
 /* globally is only allowed in different object units of a library. */
 {
-  struct Symbol *sym;
   struct ObjectUnit *ou = s->obj;
-  struct Symbol **chain = &ou->objsyms[elf_hash(name)%OBJSYMHTABSIZE];
+  uint32_t fmask = 0;
+  struct Symbol *sym,**chain;
 
+  if (gv->masked_symbols && bind==SYMB_GLOBAL) {
+    /* Symbol name ends with a decimal number used as feature mask.
+       gv->masked_symbols defines the separation character. */
+    char *p;
+    size_t len;
+
+    if (p = strrchr(name,gv->masked_symbols)) {
+      if (isdigit((unsigned char)*(++p))) {
+        fmask = atoi(p);
+        len = p - name;
+        p = alloczero(len--);
+        strncpy(p,name,len);
+        name = (const char *)p;
+      }
+    }
+  }
+
+  /* check if symbol is already defined in this object */
+  chain = &ou->objsyms[elf_hash(name)%OBJSYMHTABSIZE];
   while (sym = *chain) {
     if (!strcmp(name,sym->name)) {
       if (chkdef)  /* do we have to warn about multiple def. ourselves? */
@@ -428,6 +477,7 @@ struct Symbol *addsymbol(struct GlobalVars *gv,struct Section *s,
     chain = &sym->obj_chain;
   }
 
+  /* new symbol */
   sym = alloczero(sizeof(struct Symbol));
   sym->name = name;
   sym->indir_name = iname;
@@ -438,6 +488,7 @@ struct Symbol *addsymbol(struct GlobalVars *gv,struct Section *s,
   sym->info = info;
   sym->bind = bind;
   sym->size = size;
+  sym->fmask = fmask;
 
   if (type == SYM_COMMON) {
     /* alignment of .common section must suit the biggest common-alignment */
@@ -632,7 +683,7 @@ struct Symbol *find_any_symbol(struct GlobalVars *gv,struct Section *sec,
                                const char *name)
 /* return pointer to a global symbol or linker symbol */
 {
-  struct Symbol *sym = findsymbol(gv,sec,name);
+  struct Symbol *sym = findsymbol(gv,sec,name,0);
 
   if (sym == NULL)
     sym = findlnksymbol(gv,name);
@@ -708,6 +759,30 @@ void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
 }
 
 
+static struct SymbolMask *makesymbolmask(struct GlobalVars *gv,
+                                         const char *name,uint32_t mask)
+{
+  struct SymbolMask **chain = &gv->symmasks[elf_hash(name)%SMASKHTABSIZE];
+  struct SymbolMask *sm;
+
+  while (sm = *chain) {
+    if (!strcmp(name,sm->name)) {
+      /* mask for this symbol already exists, so add it */
+      sm->common_mask |= mask;
+      return sm;
+    }
+    chain = &sm->next;
+  }
+
+  /* make a new symbol mask */
+  *chain = sm = alloc(sizeof(struct SymbolMask));
+  sm->next = NULL;
+  sm->name = name;
+  sm->common_mask = mask;
+  return sm;
+}
+
+
 struct RelocInsert *initRelocInsert(struct RelocInsert *ri,uint16_t pos,
                                     uint16_t siz,lword msk)
 {
@@ -728,7 +803,30 @@ struct Reloc *newreloc(struct GlobalVars *gv,struct Section *sec,
 {
   struct Reloc *r = alloczero(sizeof(struct Reloc));
 
-  if (r->xrefname = xrefname) {
+  if (xrefname) {
+    /* external symbol reference */
+
+    if (gv->masked_symbols) {
+      /* Referenced symbol name ends with a decimal number used as a
+         mask for feature-requirements.
+         gv->masked_symbols defines the separation character. */
+      char *p;
+      size_t len;
+      uint32_t fmask;
+
+      if (p = strrchr(xrefname,gv->masked_symbols)) {
+        if (isdigit((unsigned char)*(++p))) {
+          fmask = atoi(p);
+          len = p - xrefname;
+          p = alloczero(len--);
+          strncpy(p,xrefname,len);
+          xrefname = (const char *)p;
+          r->relocsect.smask = makesymbolmask(gv,xrefname,fmask);
+          r->flags |= RELF_MASKED;
+        }
+      }
+    }
+
     if (sec->obj) {
       uint16_t flags = sec->obj->lnkfile->flags;
 
@@ -744,11 +842,13 @@ struct Reloc *newreloc(struct GlobalVars *gv,struct Section *sec,
         r->xrefname = new_name;
       }
     }
+    r->xrefname = xrefname;
   }
-  if (rs)
+  else if (rs)
     r->relocsect.ptr = rs;
   else
     r->relocsect.id = id;
+
   r->offset = offset;
   r->addend = addend;
   r->rtype = rtype;
@@ -932,11 +1032,8 @@ lword readsection(struct GlobalVars *gv,uint8_t rtype,uint8_t *src,
     ri = ri->next;
   }
 
-  /* sign-extend, when needed */
-  if (rtype!=R_SD && rtype!=R_SD2 && rtype!=R_SD21)
-    return sign_extend(data,maxfldsz);
-
-  return data;
+  /* always sign-extend - target has to trim the value when needed */
+  return sign_extend(data,maxfldsz);
 }
 
 
@@ -1757,7 +1854,7 @@ static struct Section *add_xtor_section(struct GlobalVars *gv,
                                         uint8_t *data,unsigned long size)
 {
   struct Section *sec = add_section(ou,name,data,size,ST_DATA,
-                                    SF_ALLOC,SP_READ|SP_WRITE,2,FALSE);
+                                    SF_ALLOC,SP_READ,gv->ptr_alignment,FALSE);
   struct SecAttrOvr *sao;
 
   if (sao = getsecattrovr(gv,name,SAO_MEMFLAGS))
@@ -1827,7 +1924,7 @@ static void write_constructors(struct GlobalVars *gv,struct ObjectUnit *ou,
       data += writetaddr(gv,data,pp->addend);
       if (pp->xrefname) {
         r = newreloc(gv,sec,pp->xrefname,NULL,0,(unsigned long)offset,
-                     R_ABS,pp->addend);
+                     gv->pcrel_ctors?R_PC:R_ABS,pp->addend);
         addreloc(sec,r,0,asize<<3,-1);
       }
       sec->size += asize;
@@ -1972,19 +2069,22 @@ void get_text_data_bss(struct GlobalVars *gv,struct LinkedSection **sections)
           if (sections[0]==NULL)
             sections[0] = ls;
           else
-            ierror("%sMultiple code sections (%s)",fn,ls->name);
+            error(138,fff[gv->dest_format]->tname,"text",
+                  sections[0]->name,ls->name);
           break;
         case ST_DATA:
           if (sections[1]==NULL)
             sections[1] = ls;
           else
-            ierror("%sMultiple data sections (%s)",fn,ls->name);
+            error(138,fff[gv->dest_format]->tname,"data",
+                  sections[1]->name,ls->name);
           break;
         case ST_UDATA:
           if (sections[2]==NULL)
             sections[2] = ls;
           else
-            ierror("%sMultiple bss sections (%s)",fn,ls->name);
+            error(138,fff[gv->dest_format]->tname,"bss",
+                  sections[2]->name,ls->name);
           break;
         default:
           ierror("%sIllegal section type %d (%s)",fn,(int)ls->type,ls->name);
@@ -2043,7 +2143,7 @@ lword entry_address(struct GlobalVars *gv)
   if (gv->entry_name) {
     lword entry = 0;
 
-    if (sym = findsymbol(gv,NULL,gv->entry_name)) {
+    if (sym = findsymbol(gv,NULL,gv->entry_name,0)) {
       return (lword)sym->value;
     }
     else if (isdigit((unsigned char)*gv->entry_name)) {
@@ -2055,7 +2155,7 @@ lword entry_address(struct GlobalVars *gv)
   }
 
   /* plan b: search for _start symbol: */
-  if (sym = findsymbol(gv,NULL,"_start"))
+  if (sym = findsymbol(gv,NULL,"_start",0))
       return (lword)sym->value;
 
   /* plan c: search for first executable section */
@@ -2074,11 +2174,11 @@ struct Section *entry_section(struct GlobalVars *gv)
 
   /* get section of entry-symbol or _start */
   if (gv->entry_name) {
-    if ((sym = findsymbol(gv,NULL,gv->entry_name)) == NULL)
+    if ((sym = findsymbol(gv,NULL,gv->entry_name,0)) == NULL)
       error(131);  /* need a valid symbolic entry */
   }
   else
-    sym = findsymbol(gv,NULL,"_start");
+    sym = findsymbol(gv,NULL,"_start",0);
 
   if (sym != NULL)
     sec = sym->relsect;
@@ -2091,8 +2191,8 @@ struct Section *entry_section(struct GlobalVars *gv)
 }
 
 
-struct Symbol *bss_entry(struct ObjectUnit *ou,const char *secname,
-                         struct Symbol *xdef)
+struct Symbol *bss_entry(struct GlobalVars *gv,struct ObjectUnit *ou,
+                         const char *secname,struct Symbol *xdef)
 /* Create a BSS section in the object ou with space for xdef's size. 
    The symbol will be changed to the base address of this section and
    enqueued in the section's object symbol list.
@@ -2106,7 +2206,7 @@ struct Symbol *bss_entry(struct ObjectUnit *ou,const char *secname,
     xdef->value = 0;
     xdef->relsect = add_section(ou,secname,NULL,xdef->size,ST_UDATA,
                                 SF_ALLOC|SF_UNINITIALIZED,
-                                SP_READ|SP_WRITE,2,TRUE);
+                                SP_READ|SP_WRITE,gv->ptr_alignment,TRUE);
     add_objsymbol(ou,xdef);
     return xdef;
   }
@@ -2153,4 +2253,26 @@ void untrim_sections(struct GlobalVars *gv)
   for (ls=(struct LinkedSection *)gv->lnksec.first;
        ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next)
     ls->filesize = ls->size;
+}
+
+
+struct LinkedSection *load_next_section(struct GlobalVars *gv)
+/* return pointer to next section with lowest LMA and remove it from list */
+{
+  struct LinkedSection *ls = (struct LinkedSection *)gv->lnksec.first;
+  struct LinkedSection *nextls,*minls = NULL;
+
+  while (nextls = (struct LinkedSection *)ls->n.next) {
+    if (minls) {
+      if (ls->copybase < minls->copybase)
+        minls = ls;
+    }
+    else
+      minls = ls;
+    ls = nextls;
+  }
+  if (minls) {
+    remnode(&minls->n);
+  }
+  return minls;
 }

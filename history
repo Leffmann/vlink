@@ -15,6 +15,23 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.16f (28.09.20)
+o New target file format os9-6809 to generate OS-9 modules for 6809 systems.
+o OS9-specific options: -os9-mem, -os9-name, -os9-ns, -os9-rev.
+o New binary target file formats applebin (Apple DOS 3.3), ataricom (Atari
+  8-bit), cocoml (Tandy Color Computer) and dragonbin (Dragon DOS).
+o New option -m enables special treatment of a feature-mask suffix in
+  symbol names (global definitions and external references).
+o New option -Crel emits constructor/destructor function references which
+  are relative to their table position.
+o Added cbmreu target for C64 REU memory expansion.
+o New linker script functions ORIGIN() and LENGTH() for memory regions.
+o Included description of linker scripts in the documentation.
+o Fixed bug with AT(lma) attribute in linker script section definitions.
+o (elf) Fixed reference to defined weak-symbols again.
+o (ados/ehf) External small-data references may have a signed addend now,
+  while small-data relocs still use an unsigned section-offset.
+
 - 0.16e (07.07.20)
 o Changing the address within an output section in a linker script didn't
   work correctly when the destination memory region (load-address) differs

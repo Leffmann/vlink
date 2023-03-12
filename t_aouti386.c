@@ -79,7 +79,7 @@ struct FFFuncs fff_aoutbsdi386 = {
   MID_I386,
   RTAB_STANDARD,RTAB_STANDARD,
   _LITTLE_ENDIAN_,
-  32,
+  32,0,
   FFF_BASEINCR
 };
 #endif
@@ -111,7 +111,7 @@ struct FFFuncs fff_aoutpc386 = {
   MID_PC386,
   RTAB_STANDARD,RTAB_STANDARD,
   _LITTLE_ENDIAN_,
-  32,
+  32,0,
   FFF_BASEINCR
 };
 #endif
