@@ -45,8 +45,8 @@ const char *pltrel_name[2] = { ".rel.plt",".rela.plt" };
 
 /* local static data */
 static struct list phdrlist;
-static struct Section *gotsec = NULL;
-static struct Section *pltsec = NULL;
+static struct Section *gotsec;
+static struct Section *pltsec;
 static int secsyms;  /* offset to find section symbols by shndx */
 
 static char ELFid[4] = {   /* identification for all ELF files */
@@ -1347,7 +1347,7 @@ size_t elf_addrela(struct GlobalVars *gv,struct LinkedSection *ls,
 
     if (ri = rel->insert)
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask),
             ls->name,rel->offset);
     else
       ierror("elf_addrela(): Reloc without insert-field");

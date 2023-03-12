@@ -200,7 +200,7 @@ static size_t xfile_writerelocs(struct GlobalVars *gv,FILE *f,
           if (rel->rtype!=R_ABS || ri->bpos!=0 || ri->bsiz!=32) {
             if (rel->rtype==R_ABS && (ri->bpos!=0 || ri->bsiz!=32))
               error(32,fff_xfile.tname,reloc_name[rel->rtype],
-                    (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+                    (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask),
                     sections[i]->name,rel->offset);
             continue;
           }

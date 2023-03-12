@@ -1,8 +1,8 @@
-/* $VER: vlink expr.c V0.16g (14.10.20)
+/* $VER: vlink expr.c V0.17a (23.04.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -109,10 +109,11 @@ char *getarg(uint8_t mask)
 /* table of valid characters, */
 /* 0=invalid, 1=valid in whole word, 2=valid, but not as first char */
 /* 4=symbols for pattern-matching, 11(+16)=valid for file names */
+/* 32=extra characters for names (sections, regions, etc.) */
   static const uint8_t validchars[256] = {
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,8,0,0,0,8,0,0,0,0,4,8,0,8,1,12, /* * . / */
+    0,8,0,0,0,8,0,0,0,0,4,8,0,40,1,12,/* * - . / */
     2,2,2,2,2,2,2,2,2,2,8,0,0,8,0,4,  /* 0-9 ? */
     8,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  /* A-O */
     1,1,1,1,1,1,1,1,1,1,1,8,0,8,8,1,  /* P-Z _ */

@@ -1,8 +1,8 @@
-/* $VER: vlink targets.c V0.16i (15.12.21)
+/* $VER: vlink targets.c V0.17a (02.04.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -106,6 +106,7 @@ struct FFFuncs *fff[] = {
 #endif
 #ifdef BBC
   &fff_bbc,
+  &fff_bbc2,
 #endif
 #ifdef CBMPRG
   &fff_cbmprg,
@@ -267,12 +268,23 @@ struct Symbol *findsymbol(struct GlobalVars *gv,struct Section *sec,
           else if (minmask != ~0)
             continue;
         }
-        else if (found && sec) {
-          /* ignore, when not from the referring ObjectUnit */
-          if (sym->relsect->obj != sec->obj)
-            continue;
+        else if (sym->fmask)
+          continue;
+
+        if (sec && sym->relsect && sym->relsect->obj==sec->obj) {
+          /* a symbol from the referers object unit is always the best match */
+          found = sym;
+          break;
         }
-        found = sym;
+
+        if (found) {
+          /* prefer symbols from already linked object units */
+          if (sym->relsect && (sym->relsect->obj->flags & OUF_LINKED) &&
+              (found->relsect && !(found->relsect->obj->flags & OUF_LINKED)))
+            found =sym;
+        }
+        else
+          found = sym;
       }
     }
     if (found!=NULL && found->type==SYM_INDIR)
@@ -736,6 +748,35 @@ struct Symbol *find_any_symbol(struct GlobalVars *gv,struct Section *sec,
 }
 
 
+static struct SymbolMask *makesymbolmask(struct GlobalVars *gv,
+                                         const char *name,uint32_t mask)
+{
+  struct SymbolMask **chain = &gv->symmasks[elf_hash(name)%SMASKHTABSIZE];
+  struct SymbolMask *sm;
+
+  while (sm = *chain) {
+    if (!strcmp(name,sm->name)) {
+      /* mask for this symbol already exists, so add it */
+      if (sm->common_mask) {
+        if (mask)
+          sm->common_mask |= mask;
+        else
+          sm->common_mask = 0;  /* one reference without mask disables it */
+      }
+      return sm;
+    }
+    chain = &sm->next;
+  }
+
+  /* make a new symbol mask */
+  *chain = sm = alloc(sizeof(struct SymbolMask));
+  sm->next = NULL;
+  sm->name = name;
+  sm->common_mask = mask;
+  return sm;
+}
+
+
 static void check_global_objsym(struct ObjectUnit *ou,struct Symbol **chain,
                                 struct Symbol *gsym,struct Symbol *sym)
 {
@@ -767,14 +808,17 @@ static void check_global_objsym(struct ObjectUnit *ou,struct Symbol **chain,
 }
 
 
-void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
-/* Check all global symbols of an object unit against the global symbol
-   table for redefinitions or common symbols.
-   This is required when a new unit has been pulled into the linking
-   process to resolve an undefined reference. */
+void pull_objunit(struct GlobalVars *gv,struct ObjectUnit *ou)
+/* called when a new object unit is pulled into the linking process */
 {
   int i;
 
+  ou->flags |= OUF_LINKED;
+
+  /* Check all global symbols of an object unit against the global symbol
+     table for redefinitions or common symbols.
+     This is required when a new unit has been pulled into the linking
+     process to resolve an undefined reference. */
   for (i=0; i<OBJSYMHTABSIZE; i++) {
     struct Symbol *sym = ou->objsyms[i];
 
@@ -792,30 +836,27 @@ void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
       sym = sym->obj_chain;
     }
   }
-}
 
+  if (gv->masked_symbols) {
+    /* add to the common feature mask from new symbol references */
+    struct Section *sec;
+    struct Reloc *r;
 
-static struct SymbolMask *makesymbolmask(struct GlobalVars *gv,
-                                         const char *name,uint32_t mask)
-{
-  struct SymbolMask **chain = &gv->symmasks[elf_hash(name)%SMASKHTABSIZE];
-  struct SymbolMask *sm;
-
-  while (sm = *chain) {
-    if (!strcmp(name,sm->name)) {
-      /* mask for this symbol already exists, so add it */
-      sm->common_mask |= mask;
-      return sm;
+    for (sec=(struct Section *)ou->sections.first;
+         sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+      for (r=(struct Reloc *)sec->xrefs.first;
+           r->n.next!=NULL; r=(struct Reloc *)r->n.next) {
+        if (r->flags & RELF_SMASK) {
+          r->flags &= ~RELF_SMASK;
+          r->relocsect.cmask = makesymbolmask(gv,r->xrefname,
+                                              r->relocsect.smask);
+          r->flags |= RELF_CMASK;
+        }
+        else
+          (void)makesymbolmask(gv,r->xrefname,0);
+      }
     }
-    chain = &sm->next;
   }
-
-  /* make a new symbol mask */
-  *chain = sm = alloc(sizeof(struct SymbolMask));
-  sm->next = NULL;
-  sm->name = name;
-  sm->common_mask = mask;
-  return sm;
 }
 
 
@@ -862,29 +903,49 @@ struct Reloc *newreloc(struct GlobalVars *gv,struct Section *sec,
   if (xrefname) {
     /* external symbol reference */
 
-    if (gv->masked_symbols) {
-      /* Referenced symbol name ends with a decimal number used as a
-         mask for feature-requirements.
-         gv->masked_symbols defines the separation character. */
-      char *p;
-      size_t len;
-      uint32_t fmask;
-
-      if (p = strrchr(xrefname,gv->masked_symbols)) {
-        if (isdigit((unsigned char)*(++p))) {
-          fmask = atoi(p);
-          len = p - xrefname;
-          p = alloczero(len--);
-          strncpy(p,xrefname,len);
-          xrefname = (const char *)p;
-          r->relocsect.smask = makesymbolmask(gv,xrefname,fmask);
-          r->flags |= RELF_MASKED;
-        }
-      }
-    }
-
     if (sec->obj) {
       uint16_t flags = sec->obj->lnkfile->flags;
+
+      if (gv->masked_symbols) {
+        /* Referenced symbol may end with a decimal number used as a
+           mask for feature-requirements.
+           gv->masked_symbols defines the separation character. */
+        uint32_t fmask=0;
+        size_t len;
+        uint8_t t;
+        char *p;
+
+        if (p = strrchr(xrefname,gv->masked_symbols)) {
+          if (isdigit((unsigned char)*(++p))) {
+            fmask = atoi(p);
+            len = p - xrefname;
+            p = alloczero(len--);
+            strncpy(p,xrefname,len);
+            xrefname = (const char *)p;
+          }
+        }
+
+        t = sec->obj->lnkfile->type;
+        if (t==ID_LIBARCH && gv->whole_archive)
+          t = ID_OBJECT;
+        switch (t) {
+          case ID_EXECUTABLE:
+          case ID_OBJECT:
+            /* Construct a common ORed mask from all symbols with this
+               name, which are currently part of the linking process. */
+            r->relocsect.cmask = makesymbolmask(gv,xrefname,fmask);
+            if (fmask)
+              r->flags |= RELF_CMASK;
+            break;
+          default:
+            /* otherwise just remember the feat. mask for later references */
+            if (fmask) {
+              r->relocsect.smask = fmask;
+              r->flags |= RELF_SMASK;
+            }
+            break;
+        }
+      }
 
       if (flags & IFF_DELUNDERSCORE) {
         if (*xrefname == '_')
@@ -1217,8 +1278,9 @@ void calc_relocs(struct GlobalVars *gv,struct LinkedSection *ls)
         isec = getinpsecoffs(ls,r->offset,&ioffs);
         /*print_function_name(isec,ioffs); <- sym-values are modified! */
         error(35,gv->dest_name,ls->name,r->offset,getobjname(isec->obj),
-              isec->name,ioffs,val,reloc_name[r->rtype],
-              (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask);
+              isec->name,ioffs,optsgnstr(val),abstaddr(val),
+              reloc_name[r->rtype],(int)ri->bpos,(int)ri->bsiz,
+              mtaddr(gv,ri->mask));
       }
       else
         ierror("%sReloc (%s+%lx), type=%s, without RelocInsert",
@@ -1781,7 +1843,7 @@ static const char *do_rename(struct SecRename *sr,const char *name)
 /* Find matching SecRename node and return the new name, if present.
    Otherwise return the original name. */
 {
-  static unsigned long unique_sec_id = 0;
+  static unsigned long unique_sec_id;
   char *newname,*p;
 
   if (name != NULL) {
@@ -1811,7 +1873,7 @@ struct Section *create_section(struct ObjectUnit *ou,const char *name,
                                uint8_t *data,unsigned long size)
 /* creates and initializes a Section node */
 {
-  static uint32_t idcnt = 0;
+  static uint32_t idcnt;
   struct Section *s = alloczero(sizeof(struct Section));
 
   s->name = do_rename(ou->lnkfile->renames,name);

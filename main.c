@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.16i (31.01.22)
+/* $VER: vlink main.c V0.17a (26.06.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -141,6 +141,8 @@ static int flavours_cmp(const void *f1,const void *f2)
 
 void cleanup(struct GlobalVars *gv)
 {
+  if (gv->fail_on_warning && gv->warncnt)
+    error(152);  /* warnings treated as errors */
   exit(gv->returncode);
 }
 
@@ -239,7 +241,8 @@ int main(int argc,const char *argv[])
           }
           else if (!strncmp(&argv[i][2],"roken",5))
             goto unknown;
-          error(9,buf);  /* invalid target format */
+          else
+            error(9,buf);  /* invalid target format */
           break;
 
         case 'c':
@@ -450,8 +453,13 @@ int main(int argc,const char *argv[])
           break;
 
         case 'w':  /* suppress warnings */
-          if (argv[i][2]) goto unknown;
-          gv->dontwarn = TRUE;
+          if (!strcmp(&argv[i][2],"fail")) {
+            gv->fail_on_warning = TRUE;
+          }
+          else {
+            if (argv[i][2]) goto unknown;
+            gv->dontwarn = TRUE;
+          }
           break;
 
         case 'x':  /* discard all local symbols */

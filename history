@@ -16,6 +16,24 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.17a (22.09.22)
+o Fixed segfault following a syntax error in the linker script.
+o Allow '-' in the linker script for section names.
+o Fixed support for masked symbols (-m option).
+o No more "out of memory" when trying to read (Linux) directories.
+o -baseoff option was broken in the last release. Fixed.
+o Make sure symbol definitions from already linked object units have priority.
+o Reworked some error messages. Print signed values and mask output according
+  to target address size.
+o New option -wfail makes vlink return with an error code not only for
+  errors but also for warnings.
+o (ados/ehf) Enabled masked symbol support.
+o (ados/ehf) Sections from executables get a unique name made out of their
+  type and memory flags.
+o (elf) NOLOAD sections should not be part of any load-segment.
+o (elf) Enabled support for R_NONE relocations.
+o (vobj) Enabled support for R_NONE relocations.
+
 - 0.17 (26.02.22)
 o Fixed bug when linking different object file formats.
 o Fixed malformatted output of some error codes for 32-bit hosts.

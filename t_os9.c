@@ -377,7 +377,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
               || (ri->mask & rmask)!=rmask)
             error(32,fff_os9_6809.tname,reloc_name[rel->rtype],
                   (int)rel->insert->bpos,(int)rel->insert->bsiz,
-                  (unsigned long long)rel->insert->mask,ls->name,rel->offset);
+                  mtaddr(gv,rel->insert->mask),ls->name,rel->offset);
 
           remnode(&rel->n);
           writesection(gv,ls->data,rel->offset,rel,

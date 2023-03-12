@@ -1011,7 +1011,7 @@ static void o65_writerelocs(struct GlobalVars *gv,FILE *f,
 
           if (ri = r->insert)
             error(32,fff[gv->dest_format]->tname,reloc_name[r->rtype],
-                  (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+                  (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask),
                   secs[i]->name,r->offset);
           else
             ierror("%smissing RelocInsert for rtype %d at %s+%lu",

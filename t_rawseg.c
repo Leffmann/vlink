@@ -168,7 +168,7 @@ static void rawseg_writeexec(struct GlobalVars *gv,FILE *f)
                   /* only abs. relocs with target addr size are supported */
                   error(32,fff_rawseg.tname,reloc_name[r->rtype],
                         (int)ri->bpos,(int)ri->bsiz,
-                        (unsigned long long)ri->mask,ls->name,r->offset);
+                        mtaddr(gv,ri->mask),ls->name,r->offset);
                   continue;
                 }
               }

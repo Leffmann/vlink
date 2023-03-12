@@ -1,8 +1,8 @@
-/* $VER: vlink t_vobj.c V0.16h (09.03.21)
+/* $VER: vlink t_vobj.c V0.17a (30.03.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021 Frank Wille
+ * Copyright (c) 1997-2022 Frank Wille
  */
 
 #include "config.h"
@@ -363,7 +363,7 @@ static void read_section(struct GlobalVars *gv,struct ObjectUnit *u,
     sym_idx = (int)read_number(0) - 1;  /* symbol index */
     flags = 0;
 
-    if (type>R_NONE && type<=LAST_STANDARD_RELOC &&
+    if (type>=R_NONE && type<=LAST_STANDARD_RELOC &&
         offs>=0 && bsiz<=(sizeof(lword)<<3) &&
         sym_idx>=0 && sym_idx<nsyms) {
       if (vsyms[sym_idx].flags & WEAK) {

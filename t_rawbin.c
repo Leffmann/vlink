@@ -74,11 +74,13 @@ static void ataricom_write(struct GlobalVars *,FILE *);
 #endif
 #ifdef BBC
 static void bbc_write(struct GlobalVars *,FILE *);
+static void bbc_write2(struct GlobalVars *,FILE *);
 #endif
 #ifdef CBMPRG
 static unsigned long cbmprg_headersize(struct GlobalVars *);
 static void cbmprg_write(struct GlobalVars *,FILE *);
 static void cbmreu_write(struct GlobalVars *,FILE *);
+static FILE *bbcload;
 #endif
 #ifdef COCOML
 static unsigned long cocoml_headersize(struct GlobalVars *);
@@ -332,6 +334,34 @@ struct FFFuncs fff_bbc = {
   rawbin_writeobject,
   rawbin_writeshared,
   bbc_write,
+  NULL,NULL,
+  0,
+  0x8000,
+  0,
+  0,
+  RTAB_UNDEF,0,
+  _LITTLE_ENDIAN_,
+  16,0,
+  FFF_SECTOUT
+};
+struct FFFuncs fff_bbc2 = {
+  "bbc2",
+  defaultscript,
+  NULL,
+  NULL,
+  NULL,
+  rawbin_headersize,
+  rawbin_identify,
+  rawbin_readconv,
+  NULL,
+  rawbin_targetlink,
+  NULL,
+  NULL,
+  NULL,
+  NULL,NULL,NULL,
+  rawbin_writeobject,
+  rawbin_writeshared,
+  bbc_write2,
   NULL,NULL,
   0,
   0x8000,
@@ -1106,6 +1136,12 @@ static void rawbin_trailer(struct GlobalVars *gv,FILE *f,
                             ((relocsize+65)&~1):udatasize+stacksize));
   }
 #endif
+#ifdef BBC
+  if(header == HDR_BBC && bbcload){
+    fprintf(bbcload,"*run %s\r",gv->dest_name);
+    fclose(bbcload);
+  }
+#endif
 }
 
 
@@ -1142,7 +1178,7 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
         if (gv->osec_base_name != NULL) {
           /* use a common base name before the section name */
           name = alloc(strlen(gv->osec_base_name)+strlen(ls->name)+2);
-          sprintf(name,"%s.%s",gv->osec_base_name,ls->name);
+	  sprintf(name,"%s.%s",gv->osec_base_name,ls->name);
         }
         else
           name = (char *)ls->name;
@@ -1174,7 +1210,12 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
           if (f != firstfile)
             fclose(f);
           name = alloc(strlen(gv->dest_name)+strlen(ls->name)+2);
-          sprintf(name,"%s.%s",gv->dest_name,ls->name);
+	  if(header == HDR_BBC){
+	    sprintf(name,"%s%s",gv->dest_name,ls->name);
+	    if(bbcload)
+	      fprintf(bbcload,"*srload %s%s 8000 %s\r",gv->dest_name,ls->name,ls->name+1);
+	  }else
+	    sprintf(name,"%s.%s",gv->dest_name,ls->name);
           if (!(f = fopen(name,"wb"))) {
             error(29,name);
             break;
@@ -1222,8 +1263,9 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
             isec = getinpsecoffs(ls,r->offset,&ioffs);
             /*print_function_name(isec,ioffs);*/
             error(35,gv->dest_name,ls->name,r->offset,getobjname(isec->obj),
-                  isec->name,ioffs,v,reloc_name[r->rtype],
-                  (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask);
+                  isec->name,ioffs,optsgnstr(v),abstaddr(v),
+                  reloc_name[r->rtype],(int)ri->bpos,(int)ri->bsiz,
+                  mtaddr(gv,ri->mask));
           }
           else
             ierror("%sReloc (%s+%lx), type=%s, without RelocInsert",
@@ -1424,6 +1466,15 @@ static void bbc_write(struct GlobalVars *gv,FILE *f)
 /* creates a single raw-binary file plus a bbc info file */
 {
   rawbin_writeexec(gv,f,TRUE,HDR_BBC);
+}
+static void bbc_write2(struct GlobalVars *gv,FILE *f)
+/* creates a single raw-binary file plus a bbc info file */
+{
+  char *name = alloc(strlen(gv->dest_name)+8);
+  sprintf(name,"load%s",gv->dest_name);
+  bbcload = fopen(name,"w");
+  rawbin_writeexec(gv,f,FALSE,HDR_BBC);
+  free(name);
 }
 #endif
 

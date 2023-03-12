@@ -1,8 +1,8 @@
-/* $VER: vlink errors.c V0.16h (09.03.21)
+/* $VER: vlink errors.c V0.17a (25.06.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -32,7 +32,7 @@ static struct {
   "Option '-%c' requires an argument",EF_FATAL,                     /* 05 */
   "No input files",EF_FATAL,
   "File \"%s\" has a read error",EF_FATAL,
-  "Cannot open \"%s\": No such file or directory",EF_FATAL,
+  "Cannot open \"%s\"",EF_FATAL,
   "Invalid target format \"%s\"",EF_FATAL,
   "Directory \"%s\" could not be examined",EF_ERROR,                /* 10 */
   "%s: File format not recognized",EF_FATAL,
@@ -46,30 +46,29 @@ static struct {
   "%s: Global symbol %s from %s is already defined in %s",EF_ERROR,
   "%s: Unresolved reference to symbol %s in %s uses "               /* 20 */
     "unsupported type %d",EF_FATAL,
-  "%s (%s+0x%lx): Reference to undefined symbol %s",EF_ERROR,
+  "%s (%s+%#lx): Reference to undefined symbol %s",EF_ERROR,
 /* FIXME! "Attributes of section %s were changed from %s in %s to %s in %s",EF_WARNING,*/
   "Attributes of section %s were changed from %s to %s in %s",EF_WARNING,
   "%s: %s expected",EF_FATAL,
-  "%s (%s+0x%lx): Illegal relative reference to %s+0x%llx",EF_ERROR, /* 24 */
-  "%s (%s+0x%lx): %dbit %s reference to %s+0x%llx (value to write: 0x%llx) "
+  "%s (%s+%#lx): Illegal relative reference to %s+%#llx",EF_ERROR,  /* 24 */
+  "%s (%s+%#lx): %dbit %s reference to %s%c%#llx (value to write: %s%#llx) "
     "out of range",EF_ERROR,
-  "%s (%s+0x%lx): Referenced absolute symbol %s=0x%llx + 0x%llx "    /* !!! */
-    "(value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,
-  "%s (%s+0x%lx): Illegal relative reference to symbol %s",EF_ERROR,
-  "%s (%s+0x%lx): Relative reference to relocatable symbol %s=0x%llx + 0x%llx "
-    "(value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,   /* !!! */
+  "%s (%s+%#lx): Referenced absolute symbol %s=%#llx%c%#llx "       /* !!! */
+    "(value to write: %s%#llx) doesn't fit into %d bits",EF_ERROR,
+  "%s (%s+%#lx): Illegal relative reference to symbol %s",EF_ERROR,
+  "%s (%s+%#lx): Relative reference to relocatable symbol %s=%#llx%c%#llx "
+    "(value to write: %s%#llx) doesn't fit into %d bits",EF_ERROR,  /* !!! */
   "Can't create output file %s",EF_ERROR,
-  "%s (%s+0x%lx): Absolute reference to relocatable symbol "         /* 30 */
-    "%s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,
+  "Target file format doesn't support shared objects",EF_ERROR,     /* 30 */
   "Error while writing to %s",EF_FATAL,
   "Target %s: Unsupported relocation type %s (offset=%d, size=%d, "
-    "mask=%llx) at %s+0x%x",EF_ERROR,
+    "mask=%llx) at %s+%#x",EF_ERROR,
   "Target %s: Can't reproduce symbol %s, which is a %s%s%s",EF_ERROR,
   "Option '%s' requires an argument",EF_FATAL,
-  "%s (%s+0x%lx): from %s (%s+0x%x): Calculated value 0x%llx doesn't fit into "
-    "relocation type %s (offset=%d, size=%d, mask=0x%llx)",EF_ERROR,/* 35 */
-  "%s (%s+0x%lx): Base relative reference to relocatable symbol "   /* !!! */
-    "%s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,
+  "%s (%s+%#lx): from %s (%s+%#x): Calculated value %s%#llx doesn't fit into "
+    "relocation type %s (offset=%d, size=%d, mask=%#llx)",EF_ERROR,/* 35 */
+  "%s (%s+%#lx): Base relative reference to relocatable symbol "   /* !!! */
+    "%s=%#llx%c%#llx (value to write: %s%#llx) doesn't fit into %d bits",EF_ERROR,
   "%s: Malformatted archive member %s",EF_FATAL,
   "%s: Empty archive ignored",EF_WARNING,
   "%s: %s doesn't support shared objects in library archives",EF_WARNING,
@@ -103,7 +102,7 @@ static struct {
   "%s: Endianness differs from previous objects",EF_FATAL,
   "Target file format doesn't support relocatable objects",EF_ERROR,
   "Predefined limits of destination memory region %s "
-    "for section %s were exceeded (0x%llx)",EF_FATAL,
+    "for section %s were exceeded (%#llx)",EF_FATAL,
   "Section %s(%s) was not recognized by target linker script",EF_WARNING,
   "%s line %d: Unknown keyword <%s> ignored",EF_ERROR,              /* 65 */
   "%s line %d: '%c' expected",EF_ERROR,
@@ -125,8 +124,8 @@ static struct {
   "Multiple use of section <%s> in linker script",EF_FATAL,
   "Intermediate uninitialized sections in ELF segment <%s> (first=<%s>, "
     "last=<%s>) will be turned into initialized",EF_WARNING,
-  "Section <%s> (0x%llx-0x%llx) conflicts with ELF segment <%s> "
-    "(currently: 0x%llx-0x%llx)",EF_ERROR,
+  "Section <%s> (%#llx-%#llx) conflicts with ELF segment <%s> "
+    "(currently: %#llx-%#llx)",EF_ERROR,
   "%s: QMAGIC is deprecated and will no longer be supported",EF_ERROR,
   "%s: a.out %s table has illegal offset or size in %s",EF_FATAL,   /* 85 */
   "%s: a.out %s table size in <%s> is not a multiple of %d",EF_ERROR,
@@ -134,84 +133,85 @@ static struct {
   "%s: a.out symbol %s has illegal binding type %d in %s",EF_ERROR,
   "%s: a.out relocations without an appropriate section in %s",EF_FATAL,
   "%s: illegal a.out relocation in section %s of %s at offset "     /* 90 */
-    "0x%08lx: <pcrel=%d len=%d ext=%d brel=%d jmptab=%d rel=%d copy=%d>",EF_ERROR,
+    "%#08lx: <pcrel=%d len=%d ext=%d brel=%d jmptab=%d rel=%d copy=%d>",EF_ERROR,
   "%s: illegal a.out external reference to symbol %s in %s, which is no "
     "external symbol",EF_ERROR,
   "%s: illegal nlist type %lu in a.out relocation in section %s of %s "
-    "at offset 0x%08lx",EF_ERROR,
+    "at offset %#08lx",EF_ERROR,
   "Target %s: Common symbol %s is unreferenced and will disappear",EF_WARNING,
   "Target file format doesn't support executable files",EF_ERROR,
   "%s: a.out relocation <pcrel=%d len=%d ext=%d brel=%d jmptab=%d " /* 95 */
     "rel=%d copy=%d> is treated as a normal relocation in "
-    "section %s of %s at offset 0x%08lx",EF_WARNING,
+    "section %s of %s at offset %#08lx",EF_WARNING,
   "%s: size %d for a.out symbol %s in %s was ignored",EF_WARNING,
   "Target %s: %s section must not be absent for a valid executable file",
     EF_FATAL,
   "Target %s: Section %s is overlapping %s",EF_FATAL,
   "%s line %d: Illegal PHDR type: <%s>",EF_ERROR,
-  "%s line %d: <%s> behind SECTIONS ignored",EF_ERROR,             /* 100 */
+  "%s line %d: <%s> behind SECTIONS ignored",EF_ERROR,              /* 100 */
   "%s line %d: Address symbol '.' invalid outside SECTIONS block",EF_ERROR,
   "%s line %d: Reference to non-absolute symbol <%s> outside SECTIONS",
     EF_ERROR,
   "%s line %d: Division by zero",EF_ERROR,
   "%s line %d: Unknown symbol or function: <%s>",EF_ERROR,
-  "%s line %d: No function-calls allowed here",EF_ERROR,           /* 105 */
+  "%s line %d: No function-calls allowed here",EF_ERROR,            /* 105 */
   "%s line %d: Symbol <%s> is not yet assigned",EF_ERROR,
   "%s line %d: Command <%s> not allowed outside SECTIONS block",EF_ERROR,
   "%s line %d: Address symbol '.' cannot be provided",EF_ERROR,
   "%s line %d: Symbol <%s> already defined",EF_ERROR,
-  "%s line %d: Only absolute expressions may be assigned outside " /* 110 */
+  "%s line %d: Only absolute expressions may be assigned outside "  /* 110 */
     "SECTIONS block",EF_ERROR,
   "%s line %d: Unknown PHDR: <%s>",EF_ERROR,
-  "%s (%s+0x%x): Cannot resolve reference to %s, because section "
+  "%s (%s+%#x): Cannot resolve reference to %s, because section "
     "%s was not recognized by the linker script",EF_ERROR,
   "%s (%s): %d bits per byte are not supported",EF_FATAL,
   "%s (%s): %d bytes per target-address are not supported",EF_FATAL,
-  "%s (%s): Relocation type %d (offset=%lld, bit-offset=%d "       /* 115 */
-    "bit-size=%d mask=0x%llx referring to symbol <%s> (type %d) is "
+  "%s (%s): Relocation type %d (offset=%lld, bit-offset=%d "        /* 115 */
+    "bit-size=%d mask=%#llx referring to symbol <%s> (type %d) is "
     "not supported",EF_ERROR,
   "%s (%s): Symbol type %d for <%s> in section %s is not supported",EF_FATAL,
-  "%s (%s+0x%lx): Cannot resolve %s reference to %s, because host "
+  "%s (%s+%#lx): Cannot resolve %s reference to %s, because host "
     "section %s is invalid",EF_ERROR,
   "%s: Malformatted ELF %s section in %s",EF_FATAL,
   "%s: Ignoring junk at end of ELF %s section in %s",EF_WARNING,
-  "%s (%s+0x%lx): Relocation based on missing %s section",EF_ERROR, /* 120 */
-  "%s (%s+0x%lx): Base-relative reference to code section",EF_WARNING,
+  "%s (%s+%#lx): Relocation based on missing %s section",EF_ERROR,  /* 120 */
+  "%s (%s+%#lx): Base-relative reference to code section",EF_WARNING,
   "Relocation table format not supported by selected output format - "
     "reverting to %s's standard",EF_WARNING,
   "Unknown relocation table format '%s' ignored",EF_WARNING,
   "Target %s: multiple small-data sections not allowed",EF_ERROR,
-  ".ctors/.dtors spread over multiple sections",EF_ERROR,          /* 125 */
+  ".ctors/.dtors spread over multiple sections",EF_ERROR,           /* 125 */
   "Dynamic symbol reference not supported by target %s",EF_ERROR,
-  "%s: ELF symbol name has illegal offset 0x%lx in %s",EF_FATAL,
+  "%s: ELF symbol name has illegal offset %#lx in %s",EF_FATAL,
   "%s: Unknown endianness defaults to %s-endian. "
     "Consider using -EB/-EL",EF_WARNING,
   "Resetting the same attribute for section %s",EF_WARNING,
-  "Bad assignment after option '%s'",EF_FATAL,                     /* 130 */
+  "Bad assignment after option '%s'",EF_FATAL,                      /* 130 */
   "Need a valid symbolic entry when using -gc-all",EF_FATAL,
   "Executable code section in first object required when using -gc-all",
     EF_FATAL,
-  "Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=0x%llx) "
+  "Unsupported absolute relocation (offs=%lld pos=%d siz=%d msk=%#llx) "
     "in resident data section",EF_ERROR,
-  "%s (%s+0x%lx): Absolute reference to resident data section (%s)",EF_WARNING,
-  "%s line %d: Undefined memory region: <%s>",EF_ERROR,            /* 135 */
+  "%s (%s+%#lx): Absolute reference to resident data section (%s)",EF_WARNING,
+  "%s line %d: Undefined memory region: <%s>",EF_ERROR,             /* 135 */
   "Executable section <%s> in data segment not allowed",EF_ERROR,
   "Not enough space for the module header (%u of %u)",EF_ERROR,
   "Target %s: multiple %s sections not allowed:<%s> and <%s>",EF_ERROR,
   "%s: symbol index %u is out of range",EF_FATAL,
-  "%s: %s is chained",EF_WARNING,                                  /* 140 */
+  "%s: %s is chained",EF_WARNING,                                   /* 140 */
   "Maximum file option size exceeded (%u)",EF_ERROR,
   "%s: Ignoring weak symbol %s",EF_WARNING,
   "%s: Unexpected relocations for section with index=%d",EF_FATAL,
   "Bad error number: %d",EF_FATAL,
-  "Error number %d is not a warning",EF_FATAL,                     /* 145 */
+  "Error number %d is not a warning",EF_FATAL,                      /* 145 */
   "%s (%s): alternating bits per byte in object files (from %d to %d)",EF_FATAL,
   "%s (%s): alternating bytes per address in object files (from %d to %d)",EF_FATAL,
   "Endianness is unknown. Default to host endianness.",EF_WARNING,
   "Mismatching target address sizes in input/output formats",EF_FATAL,
-  "%s: Hunk format corrupted: DEBUG hunk used like a section "     /* 150 */
+  "%s: Hunk format corrupted: DEBUG hunk used like a section "      /* 150 */
     "with name \"%s\" in unit \"%s\". Trying to ignore",EF_WARNING,
   "%s: Duplicate con/destructor name %s definition ignored",EF_WARNING,
+  "Warnings treated as errors",EF_ERROR,
 };
 
 
@@ -257,6 +257,7 @@ void error(int errn,...)
     return;
   switch(flags) {
     case EF_WARNING:
+      ++gv->warncnt;
       errtype = "Warning";
       break;
     case EF_ERROR:

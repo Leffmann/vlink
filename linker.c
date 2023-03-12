@@ -1,8 +1,8 @@
-/* $VER: vlink linker.c V0.16i (02.10.21)
+/* $VER: vlink linker.c V0.17a (21.05.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -71,7 +71,7 @@ void print_function_name(struct Section *sec,unsigned long offs)
 /* from the last one printed, make an output to stderr. */
 {
   static const char *infoname[] = { "", "object ", "function " };
-  static struct Symbol *last_func=NULL;
+  static struct Symbol *last_func;
   struct Symbol *sym,*func=NULL;
   int i;
 
@@ -1084,6 +1084,21 @@ void linker_load(struct GlobalVars *gv)
 }
 
 
+static void libpullmsg(struct GlobalVars *gv,struct ObjectUnit *pull_unit,
+                       struct Reloc *xref,uint32_t cmask)
+{
+  if (gv->map_file) {
+    fprintf(gv->map_file,"%s",pull_unit->lnkfile->pathname);
+    if (pull_unit->lnkfile->type == ID_LIBARCH)
+      fprintf(gv->map_file," (%s)",pull_unit->objname);
+    fprintf(gv->map_file," needed due to %s",xref->xrefname);
+    if (xref->flags & RELF_CMASK)
+      fprintf(gv->map_file,"(%x)",(unsigned)cmask);
+    fputc('\n',gv->map_file);
+  }
+}
+
+
 void linker_resolve(struct GlobalVars *gv)
 /* Resolve all symbol references and pull the required objects into */
 /* the gv->selobjects list. */
@@ -1091,7 +1106,6 @@ void linker_resolve(struct GlobalVars *gv)
   bool last_actions_done = FALSE;
   bool pseudo_dynlink = (fff[gv->dest_format]->flags&FFF_PSEUDO_DYNLINK)!=0;
   struct ObjectUnit *obj = (struct ObjectUnit *)gv->selobjects.first;
-  static const char *pulltxt = " needed due to ";
 
   if (gv->dest_sharedobj || gv->dyn_exp_all) {
     gv->dynamic = TRUE;
@@ -1121,12 +1135,12 @@ void linker_resolve(struct GlobalVars *gv)
            xref->n.next!=NULL; xref=(struct Reloc *)xref->n.next) {
 
         /* remember common mask, when set */
-        if (xref->flags & RELF_MASKED)
-          cmask = xref->relocsect.smask->common_mask;
+        if (xref->flags & RELF_CMASK)
+          cmask = xref->relocsect.cmask->common_mask;
         else
           cmask = 0;
 
-        /* preset as unresolved; warning: union! resets also smask, id, etc. */
+        /* preset as unresolved; warning: union! resets also cmask, id, etc. */
         xref->relocsect.symbol = NULL;
 
         if (xref->rtype == R_LOADREL) {
@@ -1207,14 +1221,14 @@ void linker_resolve(struct GlobalVars *gv)
             case ID_SHAREDOBJ:
               if (!(pull_unit->flags & OUF_LINKED)) {
                 if (gv->map_file) {
-                  fprintf(gv->map_file,"%s%s%s\n",
-                          pull_unit->lnkfile->pathname,pulltxt,xref->xrefname);
+                  libpullmsg(gv,pull_unit,xref,cmask);
                   /* Example: "/usr/lib/libc.so.12.0 needed due to _atexit" */
                 }
                 insertbehind(&obj->n,remnode(&pull_unit->n));
                 add_priptrs(gv,pull_unit);
-                pull_unit->flags |= OUF_LINKED;
-                reenter_global_objsyms(gv,pull_unit);
+
+                pull_objunit(gv,pull_unit);
+
                 if (!pseudo_dynlink) {
                   if (!gv->dynamic) {
                     gv->dynamic = TRUE;  /* we're doing dynamic linking! */
@@ -1263,15 +1277,13 @@ void linker_resolve(struct GlobalVars *gv)
             case ID_LIBARCH:
               if (!(pull_unit->flags & OUF_LINKED)) {
                 if (gv->map_file) {
-                  fprintf(gv->map_file,"%s (%s)%s%s\n",
-                          pull_unit->lnkfile->pathname,pull_unit->objname,
-                          pulltxt,xref->xrefname);
+                  libpullmsg(gv,pull_unit,xref,cmask);
                   /* "/usr/lib/libc.a (atexit.o) needed due to _atexit" */
                 }
                 insertbehind(&obj->n,remnode(&pull_unit->n));
                 add_priptrs(gv,pull_unit);
-                pull_unit->flags |= OUF_LINKED;
-                reenter_global_objsyms(gv,pull_unit);
+
+                pull_objunit(gv,pull_unit);
               }
               /* fall through */
 
@@ -1663,7 +1675,8 @@ void linker_join(struct GlobalVars *gv)
              sec=(struct Section *)sec->n.next) {
           int i;
 
-          if (sec->size==0 && (*(sec->name)==0 || is_ld_script(sec->obj))) {
+          if (sec->size==0 && maxls!=NULL &&
+              (*(sec->name)==0 || is_ld_script(sec->obj))) {
             struct Section *lastsec;
 
             /* @@@ append section without name and contents to the biggest
@@ -2174,13 +2187,13 @@ void linker_relocate(struct GlobalVars *gv)
                 /* resolve base-relative relocation for executable file */
                 const char *secname = rel->relocsect.lnk->name;
 
-                *(ls->data+tbytes(gv,rel->offset)+1) &= 0xe0;
+                *(ls->data+rel->offset+1) &= 0xe0;
                 if (!strcmp(secname,sdata_name) ||
                     !strcmp(secname,sbss_name)) {
                   if (sdabase) {
                     a = (lword)rel->relocsect.lnk->base +
                                rel->addend - sdabase->value;
-                    *(ls->data+tbytes(gv,rel->offset)+1) |= 13;
+                    *(ls->data+rel->offset+1) |= 13;
                     a = writesection(gv,ls->data,rel->offset,rel,a);
                     keep = FALSE;
                   }
@@ -2192,7 +2205,7 @@ void linker_relocate(struct GlobalVars *gv)
                   if (sda2base) {
                     a = (lword)rel->relocsect.lnk->base +
                                rel->addend - sda2base->value;
-                    *(ls->data+tbytes(gv,rel->offset)+1) |= 2;
+                    *(ls->data+rel->offset+1) |= 2;
                     a = writesection(gv,ls->data,rel->offset,rel,a);
                     keep = FALSE;
                   }
@@ -2268,8 +2281,8 @@ void linker_relocate(struct GlobalVars *gv)
             print_function_name(sec,rel->offset);
             error(25,getobjname(sec->obj),sec->name,rel->offset-sec->offset,
                   (int)rel->insert->bsiz,reloc_name[rel->rtype],
-                  rel->relocsect.lnk->name,
-                  (unsigned long long)rel->addend,(unsigned long long)a);
+                  rel->relocsect.lnk->name,sgnchar(rel->addend),
+                  abstaddr(rel->addend),optsgnstr(a),abstaddr(a));
           }
         }
 
@@ -2393,12 +2406,12 @@ void linker_relocate(struct GlobalVars *gv)
                     if (!gv->dest_object) {
                       const char *secname = xdef->relsect->lnksec->name;
 
-                      *(ls->data+tbytes(gv,xref->offset)+1) &= 0xe0;
+                      *(ls->data+xref->offset+1) &= 0xe0;
                       if (!strcmp(secname,sdata_name) ||
                           !strcmp(secname,sbss_name)) {
                         if (sdabase) {
                           a = xdef->value + xref->addend - sdabase->value;
-                          *(ls->data+tbytes(gv,xref->offset)+1) |= 13;
+                          *(ls->data+xref->offset+1) |= 13;
                         }
                         else
                           undef_sym_error(sec,xref,sdabase_name);
@@ -2407,7 +2420,7 @@ void linker_relocate(struct GlobalVars *gv)
                                !strcmp(secname,sbss2_name)) {
                         if (sda2base) {
                           a = xdef->value + xref->addend - sda2base->value;
-                          *(ls->data+tbytes(gv,xref->offset)+1) |= 2;
+                          *(ls->data+xref->offset+1) |= 2;
                         }
                         else
                           undef_sym_error(sec,xref,sda2base_name);
@@ -2488,9 +2501,9 @@ void linker_relocate(struct GlobalVars *gv)
                 print_function_name(sec,xref->offset);
                 error(err_no,getobjname(sec->obj),sec->name,
                       xref->offset-sec->offset,
-                      xdef->name,(unsigned long long)xdef->value,
-                      (unsigned long long)xref->addend,
-                      (unsigned long long)a,(int)xref->insert->bsiz);
+                      xdef->name,mtaddr(gv,xdef->value),
+                      sgnchar(xref->addend),abstaddr(xref->addend),
+                      optsgnstr(a),abstaddr(a),(int)xref->insert->bsiz);
               }
             }
           }

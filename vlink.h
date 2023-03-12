@@ -1,8 +1,8 @@
-/* $VER: vlink vlink.h V0.16h (09.03.21)
+/* $VER: vlink vlink.h V0.17a (26.06.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 #include <stdlib.h>
@@ -263,7 +263,8 @@ struct Reloc {                  /* relocation information */
     struct Section *ptr;        /* base addr of this sect. has to be added */
     struct LinkedSection *lnk;  /* base addr of joined sections */
     struct Symbol *symbol;      /* symbol-pointer, if x-ref. was resolved */
-    struct SymbolMask *smask;	/* ORed feat.mask of all xrefs with this name */
+    uint32_t smask;             /* symbol name's feat.mask (!OUF_LINKED) */
+    struct SymbolMask *cmask;	/* ORed feat.mask of all xrefs with this name */
   } relocsect;
   unsigned long offset;         /* section-offset of relocation */
   lword addend;                 /* add this to relocation value */
@@ -304,7 +305,8 @@ struct Reloc {                  /* relocation information */
 
 /* Reloc flags */
 #define RELF_WEAK 1             /* reference is weak and defaults to 0 */
-#define RELF_MASKED 2           /* reference uses a SymbolMask */
+#define RELF_SMASK 2            /* reference has an smask (!OUF_LINKED) */
+#define RELF_CMASK 4            /* reference has a cmask-pointer (LINKED!) */
 #define RELF_INTERNAL 0x10      /* linker-internal relocation, not exported */
 #define RELF_PLT 0x40           /* dynamic PLT relocation */
 #define RELF_DYN 0x80           /* other dynamic relocation */
@@ -515,7 +517,7 @@ struct GlobalVars {
   uint8_t bits_per_taddr;       /* bits in target address (taddr, lword) */
   uint8_t tbytes_per_taddr;     /* target bytes in a target address word */
   char masked_symbols;          /* symbols may use a feature-mask */
-  char reserved[1];
+  bool fail_on_warning;         /* return with error code from warnings */
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
   FILE *vice_file;              /* label-file for the VICE emulator */
@@ -538,6 +540,7 @@ struct GlobalVars {
   bool errflag;                 /* if true, don't create output file */
   int maxerrors;                /* # of errors to display, before aborting */
   int errcnt;                   /* number of errors displayed */
+  int warncnt;                  /* number of warnings displayed */
   int returncode;               /* return code for exit() */
 
   /* linking process */
@@ -813,6 +816,10 @@ void add_symnames(struct SymNames **,const char *,lword);
 
 #define listempty(x) ((x)->first->next==NULL)
 #define makemask(x) ((lword)(1LL<<(x))-1)
+#define mtaddr(gv,x) (unsigned long long)((x)&((lword)(1LL<<(gv)->bits_per_taddr)-1))
+#define abstaddr(x) (unsigned long long)((x)<0?-(x):(x))
+#define sgnchar(x) ((x)<0?'-':'+')
+#define optsgnstr(x) ((x)<0?"-":"")
 
 /* errors.c */
 void disable_warning(int);
@@ -887,7 +894,7 @@ struct Symbol *findlnksymbol(struct GlobalVars *,const char *);
 void fixlnksymbols(struct GlobalVars *,struct LinkedSection *);
 struct Symbol *find_any_symbol(struct GlobalVars *,
                                struct Section *,const char *);
-void reenter_global_objsyms(struct GlobalVars *,struct ObjectUnit *);
+void pull_objunit(struct GlobalVars *,struct ObjectUnit *);
 struct Section *getinpsecoffs(struct LinkedSection *,unsigned long,
                               unsigned long *);
 struct RelocInsert *initRelocInsert(struct RelocInsert *,
@@ -1147,6 +1154,7 @@ extern struct FFFuncs fff_ataricom;
 #endif
 #if defined(BBC)
 extern struct FFFuncs fff_bbc;
+extern struct FFFuncs fff_bbc2;
 #endif
 #if defined(CBMPRG)
 extern struct FFFuncs fff_cbmprg;

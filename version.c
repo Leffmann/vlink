@@ -1,4 +1,4 @@
-/* $VER: vlink version.c V0.17 (31.01.22)
+/* $VER: vlink version.c V0.17a (21.03.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -7,7 +7,7 @@
 
 
 /* version/revision */
-#define VERSION "0.17"
+#define VERSION "0.17a"
 
 #define VERSION_C
 #include "vlink.h"

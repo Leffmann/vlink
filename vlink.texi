@@ -8,7 +8,7 @@
 @setfilename vlink.texi
 @settitle vlink manual
 @setchapternewpage odd
-@set UPDATED February 2022
+@set UPDATED June 2022
 
 @ifinfo
 This is the manual for the portable multi-format linker vlink.
@@ -117,7 +117,7 @@ No shared objects. Small data offset @code{0x7ffe}. Linker symbols:
   @item _DATA_BAS_ (PhxAss)
   @item _DATA_LEN_ (PhxAss)
   @item _BSS_LEN_ (PhxAss)
-  @item _LinkerDB
+  @item _LinkerDB (all)
   @item __BSSBAS (SASC/StormC)
   @item __BSSLEN (SASC/StormC)
   @item ___ctors (SASC/StormC)
@@ -146,6 +146,10 @@ initialized part of the data-bss section and warns about absolute
 references from other sections. This mode can be used to create
 reentrable, "pure" programs, for use with the AmigaOS @command{resident}
 command.
+
+Hunk-format executables can be linked with some retrictions. All sections
+will get an auto-generated, unique, name (specifying their type and their
+memory flags).
 
 Supports @option{-Rstd} and @option{-Rshort}. The target-specific
 @option{-hunkattr} can be used to overwrite the memory flags of an input
@@ -189,6 +193,10 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 @item bbc
 Absolute raw binary output, but additionally writes an @file{.inf}-file for
 BBC Micro/Master emulators.
+
+@item bbc2
+Like bbc, but banked memory will be written to separate files (with a
+suitable linker script) and a loader script is generated.
 
 @item cbmprg
 Absolute raw binary output, similar to rawbin1, but with a header
@@ -578,9 +586,10 @@ Enable special treatment of feature-mask suffixes in symbol names.
 A decimal number after the last '@code{.}' in a symbol name is
 stored as a feature-mask for symbol definitions. The masks in references to
 the symbol's name (sans suffix) are combined to a common requirement
-mask, which is used to find the best symbol to fulfill this requirement
-(i.e. the smallest mask which has still all bits of the requirement-mask
-set).
+mask, which is used to find the best symbol to fulfill this requirement.
+Any reference to that symbol without a mask specification will disable
+that feature for all references. Also, when the requirement is not met
+by any masked symbol, then the normal symbol definition is taken.
 
 @item -minalign alignment
 Set a minimum alignment (number of bits which have to be zero) for all
@@ -731,6 +740,10 @@ Generates a label address mapping file for the VICE debugger.
 
 @item -w
 Suppress all warning messages.
+
+@item -wfail
+The return code of vlink will no longer be 0 (success), when there
+was a warning. Errors always make the return code a failure.
 
 @item -X
 Discard local symbols in the input files that start with the
@@ -1229,7 +1242,7 @@ alphabetical order, probably not complete):
 @item Option '-%c' requires an argument
 @item No input files
 @item File "%s" has a read error
-@item Cannot open "%s": No such file or directory
+@item Cannot open "%s"
 @item Invalid target format "%s"
 @item Directory "%s" could not be examined
 @item %s: File format not recognized
@@ -1251,7 +1264,7 @@ alphabetical order, probably not complete):
 @item %s (%s+0x%x): Illegal relative reference to symbol %s
 @item %s (%s+0x%x): Relative reference to relocatable symbol %s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits
 @item Can't create output file %s
-@item %s (%s+0x%x): Absolute reference to relocatable symbol %s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits
+@item Target file format doesn't support shared objects
 @item Error while writing to %s
 @item Target %s: Unsupported relocation type %s (offset=%d, size=%d, mask=%llx) at %s+0x%x
 @item Target %s: Can't reproduce symbol %s, which is a %s%s%s
@@ -1371,6 +1384,7 @@ alphabetical order, probably not complete):
 @item Mismatching target address sizes in input/output formats
 @item %s: Hunk format corrupted: DEBUG hunk used like a section with name "%s" in unit "%s". Trying to ignore
 @item %s: Duplicate con/destructor name %s definition ignored
+@item Warnings treated as errors
 
 @end enumerate
 

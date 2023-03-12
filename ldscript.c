@@ -1,8 +1,8 @@
-/* $VER: vlink ldscript.c V0.16h (03.09.21)
+/* $VER: vlink ldscript.c V0.17a (19.06.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -14,16 +14,16 @@
 #define DUMMY_SEC_FROM_PATTERN 1
 
 
-static const char *scriptbase = NULL;
+static const char *scriptbase;
 static const char *scriptname;
 static struct ObjectUnit *script_obj;
-static struct MemoryDescr *memory_blocks = NULL;
+static struct MemoryDescr *memory_blocks;
 static struct MemoryDescr *defmem,*atdefmem,*vdefmem,*ldefmem;
 static const char *defmemname = "default";
 static bool preparse;     /* no sym-assignments in SECTIONS when true */
 static int level;         /* 0=outside SECTIONS,1=inside,2=section def. */
 static struct LinkedSection *current_ls; /* current section in work */
-static const char *new_ls_name = NULL;   /* just defined sect. name (pass 1) */
+static const char *new_ls_name;          /* newly defined sect. name (pass 1) */
 
 /* BYTE, SHORT, LONG, etc. data commands */
 static int datasize,dataalign;  /* datasize != 0 enables data command */
@@ -118,19 +118,19 @@ struct ScriptCmd ldCommands[] = {
 
 static char *getword(void)
 {
-  return getarg(1);
+  return getarg(1+32);
 }
 
 
 static char *getalnum(void)
 {
-  return getarg(3);
+  return getarg(1+2);
 }
 
 
 static char *getpattern(void)
 {
-  return getarg(5);
+  return getarg(1+4+32);
 }
 
 
@@ -1606,8 +1606,9 @@ static void add_section_to_segments(struct GlobalVars *gv,
   struct Phdr *p,*p2;
   bool loadseg_present = FALSE;
 
-  if (!(ls->flags & SF_ALLOC) || ls->type==ST_UNDEFINED) {
-    /* non-allocated or undefined sections are not part of any segment! */
+  if (!(ls->flags & SF_ALLOC) || (ls->ld_flags & LSF_NOLOAD) ||
+      ls->type==ST_UNDEFINED) {
+    /* non-allocated, NOLOAD or undef. sections are not part of any segment! */
     ls->flags &= ~SF_ALLOC;
     return;
   }
@@ -1929,7 +1930,7 @@ struct Section *next_pattern(struct GlobalVars *gv,char **fpat,char ***spatlist)
    and VALIDPAT for valid file/section-patterns in fpat/spatlist. */
 {
   static char *fn = "next_pattern(): ";
-  static struct Phdr **defplist=NULL;
+  static struct Phdr **defplist;
   struct Phdr **plist;
   char c,*keyword;
 

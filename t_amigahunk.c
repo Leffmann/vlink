@@ -1,4 +1,4 @@
-/* $VER: vlink t_amigahunk.c V0.16i (14.02.22)
+/* $VER: vlink t_amigahunk.c V0.17a (06.06.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -640,6 +640,31 @@ static void create_xrefs(struct GlobalVars *gv,struct HunkInfo *hi,
 }
 
 
+static char *make_amiga_secname(char *type,uint32_t memfl,unsigned id)
+{
+  static const char *memstr[3] = { "", "chip", "fast" };
+  char *name;
+  int attr;
+
+  if (memfl == MEMF_CHIP)
+    attr = 1;
+  else if (memfl == MEMF_FAST)
+    attr = 2;
+  else
+    attr = 0;
+
+  if (id > 9999)
+    ierror("make_amiga_secname(): %s section #%u",type,id);
+  name = alloc(1+strlen(type)+strlen(memstr[attr])+(id?4:0));
+
+  strcpy(name,type);
+  strcat(name,memstr[attr]);
+  if (id)
+    sprintf(strchr(name,0),"%04u",id);
+  return name;
+}
+
+
 static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
 /* Read AmigaDOS/EHF hunks and symbols */
 {
@@ -781,21 +806,45 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
             switch (w & 0xffff) {
               case HUNK_PPC_CODE:
               case HUNK_CODE:
-                secname = ".text";
+                secname = make_amiga_secname(".text",s_attr,0);
                 break;
               case HUNK_DATA:
-                secname = ".data";
+                secname = make_amiga_secname(".data",s_attr,0);
                 break;
               case HUNK_BSS:
-                secname = ".bss";
+                secname = make_amiga_secname(".bss",s_attr,0);
                 break;
             }
           }
+
           /* Sections of an executable should never be joined, or */
           /* dangerous things will happen. */
           if (!secname && hi.exec) {
-            secname = alloc(10);
-            sprintf(secname,"S%08lx",(unsigned long)hi.hunkptr);
+            static unsigned uniqid[3];
+            int type;
+
+            /* assign a name according to the executable hunk's type */
+            switch (w & 0xffff) {
+              case HUNK_PPC_CODE:
+                secname = "ppcode";
+                type = 0;
+                break;
+              case HUNK_CODE:
+                secname = "code";
+                type = 0;
+                break;
+              case HUNK_DATA:
+                secname = "data";
+                type = 1;
+                break;
+              case HUNK_BSS:
+                secname = "bss";
+                type = 2;
+                break;
+            }
+
+            /* append memory attributes and a unique id */
+            secname = make_amiga_secname(secname,s_attr,uniqid[type]++);
           }
 
           /* create new section node */
@@ -1251,8 +1300,7 @@ static void get_resident_sdrelocs(struct GlobalVars *gv)
             else {  /* unsupported abs reloc in resident SD section */
               if (ri != NULL)
                 error(133,(unsigned long long)r->offset+sec->offset,
-                      (int)ri->bpos,(int)ri->bsiz,
-                      (unsigned long long)ri->mask);
+                      (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask));
               else
                 ierror("get_resident_sdrelocs(): missing rel reloc info");
             }
@@ -1291,8 +1339,7 @@ static void get_resident_sdrelocs(struct GlobalVars *gv)
               else {  /* unsupported abs reloc in resident SD section */
                 if (ri != NULL)
                   error(133,(unsigned long long)r->offset+sec->offset,
-                        (int)ri->bpos,(int)ri->bsiz,
-                        (unsigned long long)ri->mask);
+                        (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask));
                 else
                   ierror("get_resident_sdrelocs(): missing xref reloc info");
               }
@@ -1385,15 +1432,14 @@ static void ados_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
 static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
                                      const char *name,uint32_t mask)
 {
-  struct Symbol *sym,*second_choice,*found=NULL;
+  struct Symbol *sym,*found;
   uint32_t minmask = ~0;
 
-  for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],second_choice=NULL;
-       sym!=NULL; sym=sym->glob_chain) {
+  for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],found=NULL; sym!=NULL;
+       sym=sym->glob_chain) {
     if (!strcmp(name,sym->name)) {
       if (mask) {
         /* find a symbol with the best-matching (minimal) feature-mask */
-#if 0
         uint32_t fmask;
 
         if (fmask = sym->fmask) {
@@ -1406,45 +1452,43 @@ static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
         }
         else if (minmask != ~0)
           continue;
+      }
+      else if (sym->fmask)
+        continue;
 
-        second_choice = sym;
-        if (sec!=NULL && sym->type==SYM_RELOC) {
-          /* we prefer symbols from a section which has the same CPU-flags
-             as the caller's section */
-          if ((sec->flags & SF_EHFPPC) == (sym->relsect->flags & SF_EHFPPC))
+      if (sec && sym->relsect && sym->relsect->obj==sec->obj) {
+        /* a symbol from the referers object unit is always the best match */
+        found = sym;
+        break;
+      }
+
+      if (found) {
+        if (sym->relsect) {
+          if (sec) {
+            uint8_t f = sec->flags & SF_EHFPPC;
+          
+            /* we prefer symbols from a section which has the same CPU-flags
+               as the referer's section */
+            if (sym->type==SYM_RELOC && found->relsect &&
+                (found->relsect->flags & SF_EHFPPC) != f &&
+                (sym->relsect->flags & SF_EHFPPC) == f)
+              found = sym;
+          }
+
+          /* prefer symbols from already linked object units */
+          if ((sym->relsect->obj->flags & OUF_LINKED) &&
+              found->relsect && !(found->relsect->obj->flags & OUF_LINKED))
             found = sym;
         }
-        else
-          found = sym;
-#else
-        ierror("Feature mask doesn't work for EHF yet");
-#endif
       }
-      else { /* standard */
-        if (second_choice == NULL)
-          second_choice = sym;
+      else
         found = sym;
-        if (sec!=NULL && sym->type==SYM_RELOC) {
-          /* we prefer symbols from a section which has the same CPU-flags
-             as the caller's section */
-          if ((sec->flags & SF_EHFPPC) == (sym->relsect->flags & SF_EHFPPC))
-            break;
-        }
-        else
-          break;
-        found = NULL;
-      }
     }
   }
 
-  /* accept symbol from a section for a different CPU, if it's the only one */
-  if (!(sym=found) && second_choice)
-    sym = second_choice;
-
-  if (sym!=NULL && sym->type==SYM_INDIR)
-      return ehf_findsymbol(gv,sec,sym->indir_name,mask);
-
-  return sym;
+  if (found!=NULL && found->type==SYM_INDIR)
+    return ehf_findsymbol(gv,sec,found->indir_name,mask);
+  return found;
 }
 
 
@@ -1638,14 +1682,14 @@ static void unsupp_symbols(struct LinkedSection *sec)
 }
 
 
-static void unsupp_relocs(struct LinkedSection *sec)
+static void unsupp_relocs(struct GlobalVars *gv,struct LinkedSection *sec)
 {
   struct Reloc *rel;
 
   while (rel = (struct Reloc *)remhead(&sec->relocs)) {
     error(32,fff_amigahunk.tname,reloc_name[rel->rtype],
           (int)rel->insert->bpos,(int)rel->insert->bsiz,
-          (unsigned long long)rel->insert->mask,sec->name,rel->offset);
+          mtaddr(gv,rel->insert->mask),sec->name,rel->offset);
   }
 }
 
@@ -1718,7 +1762,7 @@ rtype_done:
     if (!rtype) {
       error(32,fff_amigahunk.tname,reloc_name[xref->rtype],
             (int)xref->insert->bpos,(int)xref->insert->bsiz,
-            (unsigned long long)xref->insert->mask,sec->name,xref->offset);
+            mtaddr(gv,xref->insert->mask),sec->name,xref->offset);
       rtype = EXT_RELREF8;  /* @@@ to keep the loop running */
     }
 
@@ -2029,7 +2073,7 @@ static void writeobject(struct GlobalVars *gv,FILE *f,bool ehf)
       reloc_hunk(gv,f,ls,HUNK_RELRELOC26,R_PC,24);
       reloc_hunk(gv,f,ls,HUNK_RELRELOC16,R_PC,14);
     }
-    unsupp_relocs(ls);  /* print unsupported relocations */
+    unsupp_relocs(gv,ls);  /* print unsupported relocations */
 
     /* external references and global definitions */
     ext_refs(gv,f,ls,ehf);
@@ -2180,7 +2224,7 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
       reloc_hunk(gv,f,ls,HUNK_DREL32,R_ABS,32);  /* HUNK_RELOC32SHORT */
     reloc_hunk(gv,f,ls,HUNK_ABSRELOC32,R_ABS,32);
     reloc_hunk(gv,f,ls,HUNK_RELRELOC32,R_PC,32);
-    unsupp_relocs(ls);  /* print unsupported relocations */
+    unsupp_relocs(gv,ls);  /* print unsupported relocations */
 
     /* symbol table */
     ext_defs(gv,f,ls,SYMB_GLOBAL,SYM_RELOC,EXT_SYMB);

@@ -1,8 +1,8 @@
-/* $VER: vlink t_elf64.c V0.16f (05.08.20)
+/* $VER: vlink t_elf64.c V0.17a (30.03.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2020  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -199,8 +199,6 @@ static void elf64_dynrefs(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
     if (shndx == SHN_UNDEF || shndx == SHN_COMMON) {
       memset(&ri,0,sizeof(struct RelocInsert));
       rtype = reloc_elf2vlink(ELF64_R_TYPE(read64(be,elfrel->r_info)),&ri);
-      if (rtype == R_NONE)
-        continue;
       r = newreloc(gv,sec,elf64_strtab(lf,ehdr,read32(be,symhdr->sh_link))
                    + read32(be,sym->st_name),
                    NULL,0,(unsigned long)read64(be,elfrel->r_offset),rtype,0);
@@ -262,8 +260,6 @@ static void elf64_reloc(struct GlobalVars *gv,struct Elf64_Ehdr *ehdr,
 
     memset(&ri,0,sizeof(struct RelocInsert));
     rtype = reloc_elf2vlink(ELF64_R_TYPE(read64(be,elfrel->r_info)),&ri);
-    if (rtype == R_NONE)
-      continue;
 
     /* if addend is not defined in Reloc, read it directly from the section */
     if (is_rela)
@@ -1122,7 +1118,7 @@ static size_t elf64_putdynreloc(struct GlobalVars *gv,struct LinkedSection *ls,
 
     if (ri = rel->insert)
       error(32,fff[gv->dest_format]->tname,reloc_name[rel->rtype],
-            (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask,
+            (int)ri->bpos,(int)ri->bsiz,mtaddr(gv,ri->mask),
             ls->name,rel->offset);
     else
       ierror("%s Reloc without insert-field",fn);
