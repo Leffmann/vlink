@@ -257,7 +257,7 @@ static void vobj_check_ar_type(struct GlobalVars *gv,struct FFFuncs *ff,
 
   p = dat;
   if (p[0]==0x56 && p[1]==0x4f && p[2]==0x42 && p[3]==0x4a &&
-      p[4]==(ff->endianess ? 1 : 2)) {
+      p[4]==(ff->endianness ? 1 : 2)) {
     p += 5;
     bpb = (int)read_number(0);  /* bits per byte */
     if ((bpb & 7) != 0) {
@@ -425,7 +425,7 @@ static void vobj_read(struct GlobalVars *gv,struct LinkFile *lf,uint8_t *data)
   if (lf->type == ID_LIBARCH) {  /* check ar-member for correct format */
     vobj_check_ar_type(gv,fff[lf->format],lf->pathname,data);
   }
-  p = data + 5;  /* skip ID and endianess */
+  p = data + 5;  /* skip ID and endianness */
 
   /* skip bits per byte and bytes per address */
   read_number(0);

@@ -1,8 +1,8 @@
-/* $VER: vlink t_o65.c V0.16h (23.02.21)
+/* $VER: vlink t_o65.c V0.16i (31.01.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 #include "config.h"
@@ -127,12 +127,13 @@ static int options(int cpu816,struct GlobalVars *gv,
                    int argc,const char *argv[],int *i)
 {
   long val;
+  int n;
 
   if (!strcmp(argv[*i],"-o65-align")) {
     uint8_t abits;
 
-    sscanf(get_arg(argc,argv,i),"%li",&val);
-    if (val<0 || (val>2 && val!=8))
+    n = sscanf(get_arg(argc,argv,i),"%li",&val);
+    if (n!=1 || val<0 || (val>2 && val!=8))
       error(130,argv[*i-1]);  /* bad assignment */
     abits = val>2 ? 3 : val;
     if (abits > o65align)
@@ -147,8 +148,8 @@ static int options(int cpu816,struct GlobalVars *gv,
   }
   else if (!cpu816 && !strncmp(argv[*i],"-o65-cpu",8)) {
     if (argv[*i][8] == '=') {
-      sscanf(&argv[*i][9],"%li",&val);
-      if (val<0 || val>15)
+      n = sscanf(&argv[*i][9],"%li",&val);
+      if (n!=1 || val<0 || val>15)
         error(130,argv[*i]);  /* bad assignment */
       o65cpu = val;
     }
@@ -171,8 +172,8 @@ static int options(int cpu816,struct GlobalVars *gv,
     o65align = 3;
   }
   else if (!strcmp(argv[*i],"-o65-stack")) {
-    sscanf(get_arg(argc,argv,i),"%li",&val);
-    if (val > (long)o65stack)
+    n = sscanf(get_arg(argc,argv,i),"%li",&val);
+    if (n!=1 || val>(long)o65stack)
       o65stack = val;
   }
   else
@@ -355,7 +356,7 @@ static int o65_getrelocs(struct GlobalVars *gv,struct o65info *o65,int secno)
         sz = 16;
         break;
       case 0x40:  /* address high-byte */
-        a = (*(d+off) << 8) | (pagedrel ? 0 : getbyte());
+        a = (((lword)*(d+off)) << 8) | (pagedrel ? 0 : getbyte());
         m = 0xff00;
         sz = 8;
         break;
@@ -365,12 +366,12 @@ static int o65_getrelocs(struct GlobalVars *gv,struct o65info *o65,int secno)
         sz = 8;
         break;
       case 0xc0:  /* 24-bit segment address */
-        a = read16le(d+off) | (*(d+off+2) << 16);
+        a = read16le(d+off) | (((lword)*(d+off+2)) << 16);
         m = -1;
         sz = 24;
         break;
       case 0xa0:  /* segment-byte of 24-bit address */
-        a = getword() | (*(d+off) << 16);
+        a = getword() | (((lword)*(d+off)) << 16);
         m = 0xff0000;
         sz = 8;
         break;
@@ -762,7 +763,7 @@ static size_t o65_genfopts(struct GlobalVars *gv,FILE *f)
       time_t now;
 
       (void)time(&now);
-      strftime(datebuf,32,"%a %b %d %T %Z %Y",localtime(&now));
+      strftime(datebuf,32,"%a %b %d %H:%M:%S %Z %Y",localtime(&now));
       len += o65_fopt(f,4,datebuf,strlen(datebuf)+1);
     }
   }

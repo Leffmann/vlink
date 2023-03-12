@@ -1,8 +1,8 @@
-/* $VER: vlink tosopts.c V0.16h (16.01.21)
+/* $VER: vlink tosopts.c V0.16i (31.01.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 #include "config.h"
@@ -18,8 +18,9 @@ int tos_options(struct GlobalVars *gv,int argc,const char *argv[],int *i)
   if (!strcmp(argv[*i],"-tos-flags")) {
     long fl;
 
-    sscanf(get_arg(argc,argv,i),"%li",&fl);
-    tos_flags = fl;
+    if (sscanf(get_arg(argc,argv,i),"%li",&fl) == 1)
+      tos_flags = fl;
+    else return 0;
   }
   else if (!strcmp(argv[*i],"-tos-fastload"))
     tos_flags |= 1;

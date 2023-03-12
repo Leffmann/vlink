@@ -1,4 +1,4 @@
-/* $VER: vlink linker.c V0.16h (20.03.21)
+/* $VER: vlink linker.c V0.16i (02.10.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -48,10 +48,16 @@ const char *getobjname(struct ObjectUnit *obj)
   const char *fn = obj->lnkfile->filename;
 
   if (obj->lnkfile->type == ID_LIBARCH) {
+    static char *buf;
     const char *on = obj->objname;
+
     if (strlen(fn)+strlen(on)+2 < FNAMEBUFSIZE) {
-      snprintf(namebuf,FNAMEBUFSIZE,"%s(%s)",fn,on);
-      return (namebuf);
+      if (buf == namebuf)
+        buf = namebuf2;
+      else
+        buf = namebuf;
+      snprintf(buf,FNAMEBUFSIZE,"%s(%s)",fn,on);
+      return (buf);
     }
   }
   return (fn);
@@ -1012,11 +1018,11 @@ void linker_load(struct GlobalVars *gv)
       error(11,objname);  /* File format not recognized */
 
     if (ff != ID_IGNORE) {
-      /* use endianess of first object read */
-      if (gv->endianess < 0)
-        gv->endianess = fff[i]->endianess;
-      else if (fff[i]->endianess>=0 && gv->endianess!=fff[i]->endianess)
-        error(61,objname);  /* endianess differs from previous objects */
+      /* use endianness of first object read */
+      if (gv->endianness < 0)
+        gv->endianness = fff[i]->endianness;
+      else if (fff[i]->endianness>=0 && gv->endianness!=fff[i]->endianness)
+        error(61,objname);  /* endianness differs from previous objects */
 
       /* determine bits per taddr from highest value in all input files */
       if (fff[i]->addr_bits > gv->bits_per_taddr)
@@ -1039,15 +1045,15 @@ void linker_load(struct GlobalVars *gv)
     }
   }
 
-  if (gv->endianess < 0) {
-    /* When endianess is still unknown, after identifying all input files,
+  if (gv->endianness < 0) {
+    /* When endianness is still unknown, after identifying all input files,
        we take it from the destination format. */
-    gv->endianess = fff[gv->dest_format]->endianess;
+    gv->endianness = fff[gv->dest_format]->endianness;
 
-    /* The destination format didn't define the endianess either?
-       Then guess by using the host endianess. */
-    if (gv->endianess < 0) {
-      gv->endianess = host_endianess();
+    /* The destination format didn't define the endianness either?
+       Then guess by using the host endianness. */
+    if (gv->endianness < 0) {
+      gv->endianness = host_endianness();
       error(148);  /* warn about it */
     }
   }
@@ -1071,7 +1077,7 @@ void linker_load(struct GlobalVars *gv)
   /* read all files and convert them into internal format */
   for (lf=(struct LinkFile *)gv->linkfiles.first;
        lf->n.next!=NULL; lf=(struct LinkFile *)lf->n.next)
-    fff[i]->readconv(gv,lf);
+    fff[lf->format]->readconv(gv,lf);
 
   collect_constructors(gv); /* scan them for con-/destructor functions */
   add_undef_syms(gv);       /* put syms. marked as undef. into 1st sec. */
@@ -2481,7 +2487,7 @@ void linker_relocate(struct GlobalVars *gv)
                 /* value of referenced symbol is out of range! */
                 print_function_name(sec,xref->offset);
                 error(err_no,getobjname(sec->obj),sec->name,
-                      (unsigned long long)xref->offset-sec->offset,
+                      xref->offset-sec->offset,
                       xdef->name,(unsigned long long)xdef->value,
                       (unsigned long long)xref->addend,
                       (unsigned long long)a,(int)xref->insert->bsiz);

@@ -221,7 +221,7 @@ static uint8_t setupRI(uint8_t rtype,struct ELF2vlink *convert,
 
 static uint8_t ppc32_reloc_elf2vlink(uint8_t rtype,struct RelocInsert *ri)
 /* Determine vlink internal reloc type from ELF reloc type and fill in
-   reloc-insert description informations.
+   reloc-insert description information.
    All fields of the RelocInsert structure are preset to zero. */
 {
   /* Reloc conversion table for V.4-ABI @@@ not complete! */
@@ -797,7 +797,7 @@ static void init_got(struct GlobalVars *gv)
 #ifdef ELF32_PPC_BE
 
 static void ppc32be_writeshared(struct GlobalVars *gv,FILE *f)
-/* creates a target-elfppc32be shared object (which is pos. independant) */
+/* creates a target-elfppc32be shared object (which is pos. independent) */
 {
   init_got(gv);
   elf32_writeexec(gv,f,EM_PPC,_BIG_ENDIAN_,ppc32_reloc_vlink2elf);
@@ -865,7 +865,7 @@ static void make_ddrelocs(struct GlobalVars *gv,struct LinkedSection *ddrel)
 
 static void amiga_writeshared(struct GlobalVars *gv,FILE *f)
 /* creates a target-elf32powerup/morphos shared object (which is pos.
-   independant) */
+   independent) */
 {
   ierror("amiga_writeshared(): Shared object generation has not "
          "yet been implemented");

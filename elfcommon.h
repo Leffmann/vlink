@@ -123,7 +123,7 @@
 #define SHT_FINI_ARRAY    15          /* Array of destructors */
 #define SHT_PREINIT_ARRAY 16          /* Array of pre-constructors */
 #define SHT_GROUP         17          /* Section group */
-#define SHT_SYMTAB_SHNDX  18          /* Extended section indeces */ 
+#define SHT_SYMTAB_SHNDX  18          /* Extended section indices */ 
 #define SHT_NUM           19          /* Number of defined types.  */
 #define SHT_LOOS          0x60000000  /* Start OS-specific */   
 #define SHT_GNU_LIBLIST   0x6ffffff7  /* Prelink library list */
@@ -334,7 +334,7 @@ extern struct list shdrlist;
 extern struct list elfdynsymlist;
 extern struct Section *elfdynrelocs;       
 extern struct Section *elfpltrelocs; 
-extern int8_t elf_endianess;
+extern int8_t elf_endianness;
 extern uint32_t elfshdridx,elfsymtabidx,elfshstrtabidx,elfstrtabidx;
 extern uint32_t elfoffset;
 extern unsigned long elf_file_hdr_gap;

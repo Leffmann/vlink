@@ -8,16 +8,18 @@
 @setfilename vlink.texi
 @settitle vlink manual
 @setchapternewpage odd
+@set UPDATED February 2022
 
 @ifinfo
 This is the manual for the portable multi-format linker vlink.
 
-Copyright 1997-2021 Frank Wille
+Copyright 1997-2022 Frank Wille
 @end ifinfo
 
 @titlepage
 @title vlink portable multi-format linker
 @author Frank Wille
+@subtitle @value{UPDATED}
 @page
 @end titlepage
 
@@ -42,7 +44,7 @@ Empty sections and other unused data are deleted to achieve a size-optimized
 output.
 
 @section Legal
-    vlink is copyright 1995-2021 by Frank Wille.
+    vlink is copyright 1995-2022 by Frank Wille.
 
     This archive may be redistributed without modifications and used
     for non-commercial purposes.
@@ -91,7 +93,7 @@ The following file formats are supported:
 @item a.out
 Currently supported:
 @itemize @minus
-  @item aoutnull (Default with standard relocs and undefined endianess)
+  @item aoutnull (Default with standard relocs and undefined endianness)
   @item aoutbsd68k (NetBSD/68k)
   @item aoutbsd68k4k (NetBSD/68k 4K page size)
   @item aoutsun010 (SunOS 68010 and AmigaOS/Atari 68000/010)
@@ -134,7 +136,9 @@ No shared objects. Small data offset @code{0x7ffe}. Linker symbols:
 @end itemize
 Automatic constructor/destructor function tables:
 @code{___ctors} and @code{___dtors} (will be mapped automatically to
-@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
+@code{__CTOR_LIST__} and @code{__DTOR_LIST__}). Fastcall-ABI
+constructors/destructors replace standard ABI ones, when using
+identical name and priority.
 
 Referencing @code{_RESLEN} switches the hunk-format output module
 into Resident mode, which will append a special relocation table to the
@@ -305,7 +309,7 @@ The following target-specific options are supported: @option{-autox}.
 @item os9-6809
 OS-9 program modules for the 6809 processor, as defined by Microware
 Systems Corporation and the NitrOS-9 project.
-Code is always position-independant and reentrant. Relocation tables
+Code is always position-independent and reentrant. Relocation tables
 for data-text and data-data references are appended at the initialized
 data section in the module. These tables have to be processed by the
 program's startup code. @command{vbcc}-style constructor/destructor tables
@@ -323,7 +327,7 @@ script, the raw binary will be relocated to base address 0.
 When option @option{-q} (keep relocs) has been specified, the linker
 will not execute absolute address relocations, but append a relocation
 offset table at the end of the file. The width of a word in this
-table matches the target's address size and uses the target's endianess.
+table matches the target's address size and uses the target's endianness.
 The first word defines the size of the following table. You may reference
 it by using the @code{__end} symbol, which marks the end of the
 bss section. It follows a byte-stream for the reloction offsets.
@@ -398,7 +402,7 @@ The following general options are supported:
 @item -Bdynamic
 Specifies that linking against dynamic libraries can take
 place. If a library specifier of the form @option{-lx} appears on
-the command line, ld searches for a library of the from
+the command line, @command{vlink} searches for a library of the from
 @file{libx.so.n.m} (see the @option{-l} option) according to the search
 rules in effect. If such a file can not be found a traditional archive
 is looked for. This options can appear anywhere on the command line and is
@@ -433,7 +437,7 @@ also "Supported file formats".
 
 @item -baseoff offset
 Defines section offset for base-relative relocations. The
-default offset is target-dependant (e.g. @code{0x7ffe} for amigaos
+default offset is target-dependent (e.g. @code{0x7ffe} for amigaos
 and @code{0x8000} for elf32m68k).
 
 @item -C constructor-type
@@ -649,7 +653,7 @@ Valid format strings are:
   @item short
     relocation table with short offsets (e.g. 16 bit)
 @end table
-Note that most targets only support one or two of those formats.
+Note that most targets only support one or two of these formats.
 
 @item -r
 Produce relocatable object file, suitable for another linker pass.
@@ -712,7 +716,7 @@ linker will display a warning.
 @item -u symbol
 Marks symbol as undefined in the first section which was
 found on the command line. This might trigger linking of
-addtional modules from standard libraries.
+additional modules from standard libraries.
 This is equivalent to the linker script command EXTERN.
 
 @item -V version
@@ -739,15 +743,19 @@ Discard all local symbols in the input files.
 Trace the manipulations inflicted on symbol.
 
 @item -Z
-Do not delete trailing zero-bytes at the end of a section in executable
-output files. Usually the uninitialized part of a section is determined
-by the difference between the section's real size and file size (for
+Do not move trailing zero-bytes in an initialized section into the
+uninitialized part of it, when generating executable output files.
+Usually the uninitialized part of a section is determined by the
+difference between the section's real size and file size (for
 those file formats which support it).
 @end table
 
-
-Target specific options @code{amigahunk}, @code{amigaehf}:
+@subsection Target specific options @code{amigahunk}, @code{amigaehf}
 @table @option
+
+@item -broken-debug
+Try to ignore free-floating debug hunks, which are used in an illegal
+way like a section, together with relocations.
 
 @item -hunkattr secname=value
 Overwrite the memory attributes of all input sections named @code{secname}
@@ -756,7 +764,7 @@ Chip-RAM: @code{-hunkattr DATA=2}. Extended memory attributes are supported.
 
 @end table
 
-Target specific options @code{aoutmint}, @code{ataritos}:
+@subsection Target specific options @code{aoutmint}, @code{ataritos}
 @table @option
 
 @item -tos-flags value
@@ -793,8 +801,7 @@ defined in.
 
 @end table
 
-
-Target specific options @code{o65-02}, @code{o65-816}:
+@subsection Target specific options @code{o65-02}, @code{o65-816}
 @table @option
 
 @item -o65-align val
@@ -832,8 +839,7 @@ Store required stack size as @code{val} to the header.
 
 @end table
 
-
-Target specific options @code{oricmc}:
+@subsection Target specific options @code{oricmc}
 @table @option
 
 @item -autox
@@ -842,8 +848,7 @@ automatically after loading.
 
 @end table
 
-
-Target specific options @code{os9-6809}:
+@subsection Target specific options @code{os9-6809}
 @table @option
 
 @item -os9-mem=val[K]
@@ -865,12 +870,11 @@ the shareable-flag in the module header, which is set otherwise.
 
 @item -os9-rev=val
 Set the revision in the OS-9 module header to @code{val}. Must be a value
-beteen 0 and 15. Defaults to zero.
+between 0 and 15. Defaults to zero.
 
 @end table
 
-
-Target specific options @code{sinclairql}:
+@subsection Target specific options @code{sinclairql}
 @table @option
 
 @item -qhdr
@@ -938,7 +942,7 @@ An optional symbol assignment looks like
 symbol =? expression;
 @end example
 where the only difference to a normal symbol assignment is, that
-@code{symbol} will only be defined with the expression when it was
+@code{symbol} will only be defined with the given expression when it was
 not already defined before (in a line above, or on the command line
 with option @option{-D}).
 
@@ -1097,7 +1101,7 @@ The following commands are currently supported in vlink linker scripts:
 
 @item LONG(expression)
   Insert a 32-bit word the current section address and assign the value of
-  @code{expression}, using the target's endianess, to it.
+  @code{expression}, using the target's endianness, to it.
 
 @item OUTPUT_ARCH()
 @itemx OUTPUT_FORMAT()
@@ -1110,7 +1114,7 @@ The following commands are currently supported in vlink linker scripts:
 
 @item QUAD(expression)
   Insert a 64-bit word the current section address and assign the value of
-  @code{expression}, using the target's endianess, to it.
+  @code{expression}, using the target's endianness, to it.
 
 @item RESERVE(space)
   Reserve @code{space} bytes at the current location counter, which are
@@ -1123,11 +1127,11 @@ The following commands are currently supported in vlink linker scripts:
 
 @item SHORT(expression)
   Insert a 16-bit word the current section address and assign the value of
-  @code{expression}, using the target's endianess, to it.
+  @code{expression}, using the target's endianness, to it.
 
 @item SQUAD(expression)
   Insert a 64-bit word the current section address and assign the value of
-  @code{expression}, using the target's endianess, to it.
+  @code{expression}, using the target's endianness, to it.
 
 @item VBCC_CONSTRUCTORS
   Set the constructor/destructor function collection strategy to
@@ -1189,8 +1193,9 @@ The following functions are currently supported in vlink linker scripts:
   @item Source level debugging support is missing for some formats.
   @item Many linker script commands are still missing.
   @item Default linker scripts are mostly missing, so you need to provide
-    your own script when using the @option{-T} option.
+    your own script by using the @option{-T} option.
   @item @code{PHDR} support for ELF is not perfect.
+  @item The feature mask option (@option{-m}) doesn't work for EHF yet.
 @end itemize
 
 @section Credits
@@ -1223,12 +1228,12 @@ alphabetical order, probably not complete):
 @item Unknown argument for option -d: %c
 @item Option '-%c' requires an argument
 @item No input files
-@item File \"%s\" has a read error
-@item Cannot open \"%s\": No such file or directory
-@item Invalid target format \"%s\"
-@item Directory \"%s\" could not be examined
+@item File "%s" has a read error
+@item Cannot open "%s": No such file or directory
+@item Invalid target format "%s"
+@item Directory "%s" could not be examined
 @item %s: File format not recognized
-@item \"%s\" is already an executable file
+@item "%s" is already an executable file
 @item %s: File format corrupted
 @item %s (%s): Illegal relocation type %d at %s+%x
 @item %s: Unexpected end of section %s in %s
@@ -1261,7 +1266,7 @@ alphabetical order, probably not complete):
 @item %s: Consistency check for archive member %s failed
 @item %s: Invalid ELF section header index (%d) in %s
 @item %s: ELF section header #%d has illegal offset in %s
-@item %s: ELF section header string table has illegal type in %s", EF_ERROR,
+@item %s: ELF section header string table has illegal type in %s
 @item %s: ELF section header string table has illegal offset in %s
 @item %s: ELF program header table in %s was ignored
 @item %s: ELF section header type %d in %s is not needed in relocatable objects
@@ -1273,11 +1278,11 @@ alphabetical order, probably not complete):
 @item %s: Illegal symbol type %d for %s in %s
 @item %s: Symbol %s has illegal binding type %d in %s
 @item %s: Symbol %s in %s is multiply defined
-@item %s: Merging a code section with name \"__MERGED\"
-@item Relative references between %s section \"%s\" and %s section \"%s\" (%s) force a combination of the two
+@item %s: Merging a code section with name "__MERGED"
+@item Relative references between %s section "%s" and %s section "%s" (%s) force a combination of the two
 @item Can't define %s as ctors/dtors label. Symbol already exists.
 @item %s: ELF section header type %d in %s is not needed in shared objects
-@item %s: Endianess differs from previous objects
+@item %s: Endianness differs from previous objects
 @item Target file format doesn't support relocatable objects
 @item Predefined limits of destination memory region %s for section %s were exceeded (0x%llx)
 @item Section %s(%s) was not recognized by target linker script
@@ -1313,12 +1318,12 @@ alphabetical order, probably not complete):
 @item Target file format doesn't support executable files
 @item %s: a.out relocation <pcrel=%d len=%d ext=%d brel=%d jmptab=%d rel=%d copy=%d> is treated as a normal relocation in section %s of %s at offset 0x%08lx
 @item %s: size %d for a.out symbol %s in %s was ignored
-@item Target %s: %s section must not be absent for a valid executable file", EF_FATAL,
+@item Target %s: %s section must not be absent for a valid executable file
 @item Target %s: Section %s is overlapping %s
 @item %s line %d: Illegal PHDR type: <%s>
 @item %s line %d: <%s> behind SECTIONS ignored
 @item %s line %d: Address symbol '.' invalid outside SECTIONS block
-@item %s line %d: Reference to non-absolute symbol <%s> outside SECTIONS", EF_ERROR,
+@item %s line %d: Reference to non-absolute symbol <%s> outside SECTIONS
 @item %s line %d: Division by zero
 @item %s line %d: Unknown symbol or function: <%s>
 @item %s line %d: No function-calls allowed here
@@ -1331,8 +1336,8 @@ alphabetical order, probably not complete):
 @item %s (%s+0x%x): Cannot resolve reference to %s, because section %s was not recognized by the linker script
 @item %s (%s): %d bits per byte are not supported
 @item %s (%s): %d bytes per target-address are not supported
-@item %s (%s): Relocation type %d (offset=%lld, bit-offset=%d bit-size=%d mask=0x%llx refering to symbol <%s> (type %d) is not supported
-@item %s (%s): Symbol type %d for <%s> in section %s is not suported
+@item %s (%s): Relocation type %d (offset=%lld, bit-offset=%d bit-size=%d mask=0x%llx referring to symbol <%s> (type %d) is not supported
+@item %s (%s): Symbol type %d for <%s> in section %s is not supported
 @item %s (%s+0x%x): Cannot resolve %s reference to %s, because host section %s is invalid
 @item %s: Malformatted ELF %s section in %s
 @item %s: Ignoring junk at end of ELF %s section in %s
@@ -1344,7 +1349,7 @@ alphabetical order, probably not complete):
 @item .ctors/.dtors spread over multiple sections
 @item Dynamic symbol reference not supported by target %s
 @item %s: ELF symbol name has illegal offset 0x%lx in %s
-@item %s: Unkown endianess defaults to %s-endian. Consider using -EB/-EL
+@item %s: Unknown endianness defaults to %s-endian. Consider using -EB/-EL
 @item Resetting the same attribute for section %s
 @item Bad assignment after option '%s'
 @item Need a valid symbolic entry when using -gc-all
@@ -1362,8 +1367,10 @@ alphabetical order, probably not complete):
 @item Error number %d is not a warning
 @item %s (%s): alternating bits per byte in object files (from %d to %d)
 @item %s (%s): alternating bytes per address in object files (from %d to %d)
-@item Endianess is unknown. Default to host endianess.
+@item Endianness is unknown. Default to host endianness.
 @item Mismatching target address sizes in input/output formats
+@item %s: Hunk format corrupted: DEBUG hunk used like a section with name "%s" in unit "%s". Trying to ignore
+@item %s: Duplicate con/destructor name %s definition ignored
 
 @end enumerate
 

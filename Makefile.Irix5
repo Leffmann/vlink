@@ -3,6 +3,7 @@
 TARGET = vlink
 DIR = Irix5
 MD = mkdir
+RM = rm -f
 
 CC = gcc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

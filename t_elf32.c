@@ -614,7 +614,7 @@ struct Symbol *elf32_pltgotentry(struct GlobalVars *gv,struct Section *sec,
                                  unsigned long offsadd,unsigned long sizeadd,
                                  int etype)
 /* Make a table entry for indirectly accessing a location from an external
-   symbol defintion (GOT_ENTRY/PLT_ENTRY) or a local relocation (GOT_LOCAL).
+   symbol definition (GOT_ENTRY/PLT_ENTRY) or a local relocation (GOT_LOCAL).
    The entry has a size of offsadd bytes, while the table section sec will
    become sizeadd bytes larger per entry. */
 {
@@ -646,7 +646,7 @@ void elf32_dynamicentry(struct GlobalVars *gv,uint32_t tag,uint32_t val,
    relsec in value-field, when nonzero */
 {
   if (dynamic) {
-    bool be = elf_endianess == _BIG_ENDIAN_;
+    bool be = elf_endianness == _BIG_ENDIAN_;
     struct Elf32_Dyn dyn;
     unsigned long offs = dynamic->size;
 
@@ -675,7 +675,7 @@ void elf32_dynamicentry(struct GlobalVars *gv,uint32_t tag,uint32_t val,
 static void elf32_makehash(struct GlobalVars *gv)
 /* Allocate and populate .hash section. */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
   size_t nsyms = elfdsymlist.nextindex;
   size_t nbuckets = elf_num_buckets(nsyms);
   struct Section *hashsec = find_sect_name(gv->dynobj,hash_name);
@@ -751,7 +751,7 @@ void elf32_dyncreate(struct GlobalVars *gv,const char *pltgot_name)
   elf32_dynamicentry(gv,DT_STRSZ,dynstr->size,NULL);
   elf32_dynamicentry(gv,DT_SYMENT,sizeof(struct Elf32_Sym),NULL);
   elf32_dynamicentry(gv,DT_DEBUG,0,NULL); /* needed? */
-  /* do we have a .plt or .got section (target dependant) */
+  /* do we have a .plt or .got section (target dependent) */
   if (pltgot = find_sect_name(gv->dynobj,pltgot_name)) {
     elf32_dynamicentry(gv,DT_PLTGOT,0,pltgot);    
   }
@@ -853,7 +853,7 @@ static struct ShdrNode *elf32_addshdr(uint32_t name,uint32_t type,
 static void elf32_writephdrs(struct GlobalVars *gv,FILE *f)
 /* write 32-bit ELF Program Header (PHDR) */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
   long gapsize = elf_file_hdr_gap;
   struct Elf32_Phdr phdr;
   struct Phdr *p;
@@ -884,7 +884,7 @@ static void elf32_writeshdrs(struct GlobalVars *gv,FILE *f,
 /* write all section headers */
 {
   const char *fn = "elf32_writeshdrs():";
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
   struct LinkedSection *ls;
   struct ShdrNode *shn;
   uint32_t type;
@@ -981,7 +981,7 @@ static void elf32_sec2shdr(struct LinkedSection *ls,bool bss,uint64_t f)
 
   shn = elf32_addshdr(elf_addshdrstr(ls->name),type,(uint32_t)f,ls->base,
                       elfoffset,ls->size,0,info,1<<(uint32_t)ls->alignment,
-                      entsize,elf_endianess);
+                      entsize,elf_endianness);
 
 
   if (stabdebugidx && !strcmp(ls->name,".stab"))
@@ -993,7 +993,7 @@ static void elf32_addrelocs(struct GlobalVars *gv,
                             uint8_t (*reloc_vlink2elf)(struct Reloc *))
 /* creates relocations for all sections */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
   struct LinkedSection *ls;
   struct Reloc *rel;
   uint32_t sroffs=0,roffs=0;
@@ -1035,7 +1035,7 @@ static void elf32_addrelocs(struct GlobalVars *gv,
 static void elf32_makeshstrtab(void)
 /* creates .shstrtab */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
 
   elf32_addshdr(elfshstrtabidx,SHT_STRTAB,0,0,elfoffset,
                 elfshstrlist.nextindex,0,0,1,0,be);
@@ -1047,7 +1047,7 @@ static void elf32_makeshstrtab(void)
 static void elf32_makestrtab(void)
 /* creates .strtab */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
 
   elf32_addshdr(elfstrtabidx,SHT_STRTAB,0,0,elfoffset,
                 elfstringlist.nextindex,0,0,1,0,be);
@@ -1060,7 +1060,7 @@ static void elf32_makestabstr(void)
 /* create .stabstr */
 {
   if (stabdebugidx) {
-    bool be = elf_endianess == _BIG_ENDIAN_;
+    bool be = elf_endianness == _BIG_ENDIAN_;
     uint32_t size = 0;
     struct StabCompUnit *cu;
 
@@ -1081,7 +1081,7 @@ static void elf32_makestabstr(void)
 static void elf32_makesymtab(uint32_t strtabindex)
 /* creates .symtab */
 {
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
 
   elf32_addshdr(elfsymtabidx,SHT_SYMTAB,0,0,elfoffset,
                 elfsymlist.nextindex * sizeof(struct Elf32_Sym),
@@ -1141,7 +1141,7 @@ static void elf32_makedynamic(struct GlobalVars *gv,
 {
   if (gv->dynamic) {
     const char *fn = "elf32_makedynamic():";
-    bool be = elf_endianess == _BIG_ENDIAN_;
+    bool be = elf_endianness == _BIG_ENDIAN_;
     int rela = gv->reloctab_format==RTAB_ADDEND ? 1 : 0;
     struct LinkedSection *ls;
     uint8_t *dynp,*pltp;
@@ -1237,7 +1237,7 @@ static void elf32_makestabs(struct GlobalVars *gv)
 /* create .stab, .stabstr und .rela.stab sections from StabDebug records */
 {
   static const char *fn = "elf32_makestabs";
-  bool be = elf_endianess == _BIG_ENDIAN_;
+  bool be = elf_endianness == _BIG_ENDIAN_;
 
   stabdebugidx = 0;
   initlist(&stabcompunits);
@@ -1370,11 +1370,11 @@ static void elf32_makestabs(struct GlobalVars *gv)
 
 
 static void elf32_initoutput(struct GlobalVars *gv,uint32_t init_file_offset,
-                             int8_t output_endianess)
+                             int8_t output_endianness)
 /* initialize section header, program header, relocation, symbol, */
 /* string and section header string lists */
 {
-  elf_initoutput(gv,init_file_offset,output_endianess);
+  elf_initoutput(gv,init_file_offset,output_endianness);
   elf_initsymtabs(sizeof(struct Elf32_Sym),elf32_initsym);
 
   reloclist = elf_newreloclist(sizeof(struct Elf32_Rela),

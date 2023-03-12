@@ -247,7 +247,7 @@ bool checkrange(lword val,bool sign,int size)
 }
 
 
-int8_t host_endianess(void)
+int8_t host_endianness(void)
 {
   static uint32_t x = 0x01020304;
 
@@ -701,7 +701,7 @@ void fwritetbyte(struct GlobalVars *gv,FILE *fp,lword w)
 
   if (bpb > 16*sizeof(uint8_t))
     ierror("fwritetbyte(): bpb>128 (%d)",bpb);
-  writereloc(gv->endianess,buf,0,bpb,w);
+  writereloc(gv->endianness,buf,0,bpb,w);
   fwritex(fp,buf,(bpb+7)/8);
 }
 

@@ -3,6 +3,7 @@
 TARGET = vlink_os3
 DIR = AmigaM68k
 MD = makedir
+RM = rm -f
 
 CC = vc +aos68k
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

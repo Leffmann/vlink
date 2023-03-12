@@ -26,7 +26,7 @@ bool ar_init(struct ar_info *ai,char *p,unsigned long plen,const char *name)
 
 
 bool ar_extract(struct ar_info *ai)
-/* fill ar_info structure with informations about the next */
+/* fill ar_info structure with information about the next */
 /* archive member */
 {
   struct ar_hdr *ah;

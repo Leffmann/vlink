@@ -16,9 +16,13 @@ $(TARGET): $(DIR) $(vlinkobjects)
 	$(CC) $(CCOUT)$(DIR)/version.o $(COPTS) $(CONFIG) version.c
 	$(LD) $(LDOUT)$(TARGET) $(LDOPTS) $(vlinkobjects) $(DIR)/version.o $(LIBS)
 
+clean:
+	$(RM) $(TARGET)
+	$(RM) $(vlinkobjects)
+
 vlink.pdf: vlink.texi
 	texi2dvi --pdf vlink.texi
-	rm -f vlink.aux vlink.log vlink.pg vlink.toc vlink.vr vlink.cp vlink.fn vlink.ky vlink.tp
+	$(RM) vlink.aux vlink.log vlink.pg vlink.toc vlink.vr vlink.cp vlink.fn vlink.ky vlink.tp
 
 vlink.html: vlink.texi
 	texi2html -split=chapter -nosec_nav -frames vlink.texi

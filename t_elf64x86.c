@@ -70,7 +70,7 @@ static int x86_64_identify(struct GlobalVars *gv,char *name,uint8_t *p,
 
 static uint8_t x86_64_reloc_elf2vlink(uint8_t rtype,struct RelocInsert *ri)
 /* Determine vlink internal reloc type from ELF reloc type and fill in
-   reloc-insert description informations.
+   reloc-insert description information.
    All fields of the RelocInsert structure are preset to zero. */
 {
   /* Reloc conversion table for V.4-ABI */
@@ -205,7 +205,7 @@ static uint8_t x86_64_reloc_vlink2elf(struct Reloc *r)
 
 
 static void x86_64_writeshared(struct GlobalVars *gv,FILE *f)
-/* creates a target-elf32i386 shared object (which is pos. independant) */
+/* creates a target-elf32i386 shared object (which is pos. independent) */
 {
   ierror("x86_64_writeshared(): Shared object generation has not "
          "yet been implemented");

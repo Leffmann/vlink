@@ -3,6 +3,7 @@
 TARGET = vlink_wos
 DIR = WarpOS
 MD = makedir
+RM = delete force quiet
 
 CC = vc +warpos
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

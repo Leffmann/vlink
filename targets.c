@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.16h (09.03.21)
+/* $VER: vlink targets.c V0.16i (15.12.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -268,7 +268,7 @@ struct Symbol *findsymbol(struct GlobalVars *gv,struct Section *sec,
             continue;
         }
         else if (found && sec) {
-          /* ignore, when not from the refering ObjectUnit */
+          /* ignore, when not from the referring ObjectUnit */
           if (sym->relsect->obj != sec->obj)
             continue;
         }
@@ -736,6 +736,37 @@ struct Symbol *find_any_symbol(struct GlobalVars *gv,struct Section *sec,
 }
 
 
+static void check_global_objsym(struct ObjectUnit *ou,struct Symbol **chain,
+                                struct Symbol *gsym,struct Symbol *sym)
+{
+  if (gsym!=NULL && gsym!=sym &&
+      gsym->relsect!=NULL && (gsym->relsect->obj->flags & OUF_LINKED)) {
+    if (sym->type==SYM_COMMON && gsym->type==SYM_COMMON) {
+      if ((sym->size>gsym->size && sym->value>=gsym->value) ||
+          (sym->size>=gsym->size && sym->value>gsym->value)) {
+        /* replace by common symbol with bigger size or alignment */
+        sym->glob_chain = gsym->glob_chain;
+        remove_obj_symbol(gsym);  /* delete old symbol in object unit */
+        *chain = sym;
+      }
+    }
+    else {
+      if ((ou->lnkfile->type != ID_SHAREDOBJ) &&
+          (gsym->relsect->obj->lnkfile->type != ID_SHAREDOBJ) &&
+          ((gsym->relsect->flags & SF_EHFPPC)
+           == (sym->relsect->flags & SF_EHFPPC))) {
+        /* Global symbol "x" is already defined in... */
+        error(19,ou->lnkfile->pathname,sym->name,getobjname(ou),
+              getobjname(gsym->relsect->obj));
+      }
+      /* An identical symbol in an EHFPPC and a non-EHFPPC section
+         of a library is tolerated - "amigaehf" will pick the right one.
+         Also redefinitions from shared objects are simply ignored. */
+    }
+  }
+}
+
+
 void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
 /* Check all global symbols of an object unit against the global symbol
    table for redefinitions or common symbols.
@@ -754,47 +785,8 @@ void reenter_global_objsyms(struct GlobalVars *gv,struct ObjectUnit *ou)
 
         while (gsym = *chain) {
           if (!strcmp(sym->name,gsym->name))
-            break;
-          chain = &gsym->glob_chain;
-        }
-
-        if (gsym!=NULL && gsym!=sym) {
-          if (sym->type==SYM_COMMON && gsym->type==SYM_COMMON) {
-            if ((sym->size>gsym->size && sym->value>=gsym->value) ||
-                (sym->size>=gsym->size && sym->value>gsym->value)) {
-              /* replace by common symbol with bigger size or alignment */
-              sym->glob_chain = gsym->glob_chain;
-              remove_obj_symbol(gsym);  /* delete old symbol in object unit */
-              *chain = sym;
-            }
-          }
-          else {
-            if (ou->lnkfile->type < ID_SHAREDOBJ)  {
-              /* Global symbol "x" is already defined in... */
-              error(19,ou->lnkfile->pathname,sym->name,getobjname(ou),
-                    getobjname(gsym->relsect->obj));
-            }
-            #if 0
-            /* This causes problems when using the same symbols for different
-               CPUs, as with WarpOS/68k mixed-binaries (target amigaehf) */
-            else {
-              /* hide library symbol by replacing its name by:
-                 __<object unit name>__<symbol name> */
-              char buf[10];
-              char *oname,*newname;
-
-              if (ou->objname == NULL) {
-                sprintf(buf,"o%08lx",(unsigned long)ou);
-                oname = buf;
-              }
-              else
-                oname = ou->objname;
-              newname = alloc(strlen(oname) + strlen(sym->name) + 5);
-              sprintf(newname,"__%s__%s",oname,sym->name);
-              sym->name = newname;
-            }
-            #endif
-          }
+            check_global_objsym(ou,chain,gsym,sym);
+          chain = &(*chain)->glob_chain;
         }
       }
       sym = sym->obj_chain;
@@ -1069,7 +1061,7 @@ lword readsection(struct GlobalVars *gv,uint8_t rtype,
 /* Read data from section at 'src' + 'secoffs', using the field-offsets,
    sizes and masks from the supplied list of RelocInsert structures. */
 {
-  int be = gv->endianess != _LITTLE_ENDIAN_;
+  int be = gv->endianness != _LITTLE_ENDIAN_;
   int maxfldsz = 0;
   lword data = 0;
 
@@ -1110,7 +1102,7 @@ lword writesection(struct GlobalVars *gv,uint8_t *dest,size_t secoffs,
    Returns 0 on success or the masked and normalized value which failed
    on the range check. */
 {
-  bool be = gv->endianess != _LITTLE_ENDIAN_;
+  bool be = gv->endianness != _LITTLE_ENDIAN_;
   uint8_t t = r->rtype;
   bool signedval = t==R_PC||t==R_GOTPC||t==R_GOTOFF||t==R_PLTPC||t==R_PLTOFF||
                    t==R_SD||t==R_SD2||t==R_SD21||t==R_MOSDREL;
@@ -1152,7 +1144,7 @@ lword writesection(struct GlobalVars *gv,uint8_t *dest,size_t secoffs,
 
 int writetaddr(struct GlobalVars *gv,void *dst,size_t offs,lword d)
 {
-  bool be = gv->endianess == _BIG_ENDIAN_;
+  bool be = gv->endianness == _BIG_ENDIAN_;
   uint8_t *p = dst;
 
   p += tbytes(gv,offs);
@@ -1291,19 +1283,37 @@ void add_priptrs(struct GlobalVars *gv,struct ObjectUnit *ou)
 
       if ((c = strcmp(newpp->secname,pp->secname)) > 0)
         break;
+
       if (!c) {
         if ((c = strcmp(newpp->listname,pp->listname)) > 0)
           break;
-        if (!c && newpp->priority < pp->priority)
-          break;
+
+        if (!c) {
+          if (newpp->priority < pp->priority)
+            break;
+
+          if (newpp->priority==pp->priority &&
+              !strcmp(newpp->xrefname+1,pp->xrefname+1)) {
+            /* same priority and identical name, except for first character */
+            if (*newpp->xrefname == *pp->xrefname)
+              error(151,getobjname(ou),newpp->xrefname);  /* duplicate */
+            else if (*newpp->xrefname == '@') {
+              /* @(fastcall) PriPointer replaces _(standard) */
+              remnode(&pp->n);
+              pp = nextpp;
+              break;
+            }
+            newpp = NULL;  /* do not insert, ignore */
+            break;
+          }
+        }
       }
+
       pp = nextpp;
     }
 
-    if (pp->n.pred)
+    if (newpp)
       insertbefore(&newpp->n,&pp->n);
-    else
-      addhead(&gv->pripointers,&newpp->n);  /* first node in list */
   }
 }
 
@@ -1402,8 +1412,12 @@ static void add_xtors(struct GlobalVars *gv,struct list *objlist,
       while (sym) {
         if (sym->bind==SYMB_GLOBAL) {
           p = sym->name;
-          if (!elf && (*p=='_' || *p=='@'))
-            p++;
+          if (!elf && (*p=='_' || *p=='@')) {
+            if (*p++ == '@') {  /* m68k fastcall-ABI */
+              if (*p == '$')    /* m68k vbcccall-ABI */
+                p++;
+            }
+          }
           if (!strncmp(p,cname,clen))
             new_priptr(obj,csecname,clabel,xtors_pri(p+clen),sym->name,0);
           else if (!strncmp(p,dname,dlen))
@@ -1604,7 +1618,7 @@ struct ObjectUnit *art_objunit(struct GlobalVars *gv,const char *n,
 
 
 void add_objunit(struct GlobalVars *gv,struct ObjectUnit *ou,bool fixrelocs)
-/* adds an ObjectUnit to the approriate list */
+/* adds an ObjectUnit to the appropriate list */
 {
   if (ou) {
     uint8_t t = ou->lnkfile->type;
@@ -1767,10 +1781,23 @@ static const char *do_rename(struct SecRename *sr,const char *name)
 /* Find matching SecRename node and return the new name, if present.
    Otherwise return the original name. */
 {
+  static unsigned long unique_sec_id = 0;
+  char *newname,*p;
+
   if (name != NULL) {
     for (; sr!=NULL; sr=sr->next) {
-      if (!strcmp(sr->orgname,name))
-        return sr->newname;
+      if (!strcmp(sr->orgname,name)) {
+        name = sr->newname;
+        break;
+      }
+    }
+
+    /* replace "DONTMERGE" by a unique section id */
+    if (p = strstr(name,"DONTMERGE_")) {
+      newname = alloc(strlen(name)+1);
+      memcpy(newname,name,p-name);
+      sprintf(newname+(p-name),"%09lu%s",unique_sec_id++,p+9);
+      return newname;
     }
   }
   else
@@ -1792,7 +1819,7 @@ struct Section *create_section(struct ObjectUnit *ou,const char *name,
   s->data = data;
   s->size = size;
   s->obj = ou;
-  s->id = idcnt++;       /* target dependant - ELF replaces this with shndx */
+  s->id = idcnt++;       /* target dependent - ELF replaces this with shndx */
   initlist(&s->relocs);  /* empty relocation list */
   initlist(&s->xrefs);   /* empty xref list */
   return s;
@@ -2198,7 +2225,7 @@ void text_data_bss_gaps(struct LinkedSection **sections)
   }
   if (sections[1] && sections[2]) {
     sections[1]->gapsize = sections[2]->base -
-                           (sections[1]->base + sections[1]->filesize);
+                           (sections[1]->base + sections[1]->size);
   }
 }
 

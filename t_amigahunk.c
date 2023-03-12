@@ -1,8 +1,8 @@
-/* $VER: vlink t_amigahunk.c V0.16h (16.01.21)
+/* $VER: vlink t_amigahunk.c V0.16i (14.02.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -126,7 +126,7 @@ static const char merged_name[] = "__MERGED";
 static const char nomerge_name[] = "_NOMERGE";
 static unsigned long merged_hash,nomerge_hash;
 
-static bool exthunk,symhunk,resmode;
+static bool exthunk,symhunk,resmode,broken_debug;
 static struct list *rlist,rrlist;
 static int *rcnt,rrcnt;
 
@@ -151,9 +151,12 @@ static int options(struct GlobalVars *gv,int argc,const char **argv,int *i)
     val = get_assign_arg(argc,argv,i,secname,64);
     sao = addsecattrovr(gv,secname,SAO_MEMFLAGS);
     sao->memflags = (uint32_t)val;
-    return 1;
   }
-  return 0;
+  else if (!strcmp(argv[*i],"-broken-debug"))
+    broken_debug = TRUE;
+  else
+    return 0;
+  return 1;
 }
 
 
@@ -280,7 +283,7 @@ static uint32_t skiphunk(struct HunkInfo *hi)
 
   if ((type==HUNK_PPC_CODE || (type>=HUNK_CODE && type<=HUNK_BSS)) &&
       (n & HUNKF_MEMTYPE) == (HUNKF_FAST|HUNKF_CHIP))
-    movehunkptr32(hi,1);  /* skip memory attributes @@@ inofficial! */
+    movehunkptr32(hi,1);  /* skip memory attributes @@@ unofficial! */
 
   switch (type) {
     case HUNK_UNIT:
@@ -435,7 +438,7 @@ static int identify(char *name,uint8_t *p,unsigned long plen,bool lib)
   /* Now check if any unit contains EHF hunks */
   init_hunkinfo(&hi,name,p,plen);
   while (w = skiphunk(&hi)) {
-    if (w & 0xffff == HUNK_PPC_CODE)
+    if ((w & 0xffff) == HUNK_PPC_CODE)
       return -type;  /* it's an EHF object/library, containing PPC code */
   }
   return type;
@@ -523,7 +526,7 @@ static char *gethunkname(struct HunkInfo *hi)
 
 static bool create_debuginfo(struct GlobalVars *gv,struct HunkInfo *hi,
                              struct Section *s)
-/* read amigahunk/ehf debugging informations */
+/* read amigahunk/ehf debugging information */
 {
   int32_t len;
   uint32_t base;
@@ -562,9 +565,17 @@ static bool create_debuginfo(struct GlobalVars *gv,struct HunkInfo *hi,
     }
     else /* too short... ignore */
       movehunkptr32(hi,len);
-    return TRUE;
   }
-  return FALSE;
+  else {
+    if (!broken_debug) {
+      /* ignore free-floating DEBUG hunk without any section */
+      /* @@@ may contain some compiler-specific debug data */
+      movehunkptr32(hi,read32be(hi->hunkptr+4)+2);
+    }
+    else
+      return FALSE;
+  }
+  return TRUE;
 }
 
 
@@ -761,7 +772,7 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
             s_allocsize = 0;
             s_attr = (w>>29) & (MEMF_FAST|MEMF_CHIP);
             if (s_attr == (MEMF_FAST|MEMF_CHIP))
-              s_attr = nextword32(&hi);  /* @@@ this seems inofficial! */
+              s_attr = nextword32(&hi);  /* @@@ this seems unofficial! */
           }
 
           if (gv->fix_unnamed==TRUE &&
@@ -968,7 +979,7 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
                 create_xrefs(gv,&hi,s,xname,R_PC,32);
                 break;
 
-              /* The following are INOFFICIAL base-relative */
+              /* The following are UNOFFICIAL base-relative */
               /* common symbol references, created for vbcc */
               case EXT_DEXT32COMMON:
                 create_xdef(gv,s,xname,(int32_t)nextword32(&hi),
@@ -1001,8 +1012,20 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
         break;
 
       case HUNK_DEBUG:
-        if (!create_debuginfo(gv,&hi,s))
-          error(17,lf->pathname,"HUNK_DEBUG",u?u->objname:lf->filename);
+        if (!create_debuginfo(gv,&hi,s)) {
+          /* no parent section defined and -broken-debug option given */
+          if (u) {
+            nextword32(&hi);
+            w = nextword32(&hi);  /* hunk length */
+            s = create_section(u,secname,hi.hunkptr,(unsigned long)w<<2);
+            s->type = ST_TMP;  /* ignore this section */
+            s->id = ~0;
+            movehunkptr32(&hi,w);
+            error(150,lf->pathname,secname?secname:noname,u->objname);
+          }
+          else
+            error(17,lf->pathname,"HUNK_DEBUG",lf->filename);
+        }
         break;
 
       case HUNK_OVERLAY:
@@ -1362,14 +1385,15 @@ static void ados_setlnksym(struct GlobalVars *gv,struct Symbol *xdef)
 static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
                                      const char *name,uint32_t mask)
 {
-  struct Symbol *sym,*second_choice,*found;
+  struct Symbol *sym,*second_choice,*found=NULL;
   uint32_t minmask = ~0;
 
-  for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],second_choice=NULL,found=NULL;
+  for (sym=gv->symbols[elf_hash(name)%SYMHTABSIZE],second_choice=NULL;
        sym!=NULL; sym=sym->glob_chain) {
     if (!strcmp(name,sym->name)) {
       if (mask) {
         /* find a symbol with the best-matching (minimal) feature-mask */
+#if 0
         uint32_t fmask;
 
         if (fmask = sym->fmask) {
@@ -1392,6 +1416,9 @@ static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
         }
         else
           found = sym;
+#else
+        ierror("Feature mask doesn't work for EHF yet");
+#endif
       }
       else { /* standard */
         if (second_choice == NULL)
@@ -1405,6 +1432,7 @@ static struct Symbol *ehf_findsymbol(struct GlobalVars *gv,struct Section *sec,
         }
         else
           break;
+        found = NULL;
       }
     }
   }

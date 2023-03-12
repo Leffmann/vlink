@@ -16,6 +16,33 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.17 (26.02.22)
+o Fixed bug when linking different object file formats.
+o Fixed malformatted output of some error codes for 32-bit hosts.
+o The string "DONTMERGE_" within a section name is replaced by a
+  unique id to optionally prevent merging with any other section.
+o Report global symbol name conflicts from linked library objects,
+  except when their definition sections belong to different
+  architectures (needed for linking mixed binaries, like WarpOS 68k/PPC).
+o Fixed random values from illegal arguments for various "-opt <n>" style
+  options.
+o Target format option (-b) is now parsed before any other option, so
+  target-specific options may appear in front of it again.
+o (rawbin) Fixed output of leading empty sections, which don't have
+  the NOLOAD flag.
+o (rawbin) Fixed file size in AMSDOS header at offset 64.
+o (a.out) aoutnull must default to 32 bit addresses.
+o (a.out) Make baserel (small-data) relocations compatible to GNU-binutils.
+o (ados/ehf) Fixed recognition of EHF objects and libraries.
+o (ados/ehf) Ignore free-floating debug hunks (SAS/C debug?).
+o (ados/ehf) New option -broken-debug.
+o (ados/ehf) Fastcall-ABI constructors/destructors (symbol names
+  starting with '@' instead of '_') replace standard ones, when
+  priority and name is otherwise identical.
+o (ados/ehf) Fixed EHF symbol redefinition bug since V0.16f.
+o (tos) Make sure data section size is even. No longer try to add the
+  uninitialized data part to bss.
+
 - 0.16h (28.04.21)
 o Prepared the code to work with architectures which don't use 8-bit
   bytes. Currently it should work with multiples of 8 bits.
@@ -45,7 +72,7 @@ o (rawseg) Fixed relocations to linker-script symbols in unallocated
 
 - 0.16g (31.12.20)
 o New target file format bbc to generate .inf files for BBC Micro/Master.
-o Fixed symbol assignments refering to other symbols in linker scripts.
+o Fixed symbol assignments referring to other symbols in linker scripts.
 o Optional symbol assignments can be done with =?. Such an assignment will
   be silently ignored when the symbol already exists.
 o New option -D to define linker symbols on the command line.
@@ -195,7 +222,7 @@ o New option -hunkattr, which assigns memory attributes to an input section
 o (elf) Introduced the new target "elf32jag", an unofficial ELF target
   for the Atari Jaguar RISC CPU.
 o (ados/ehf) Read/write extended memory attributes (0xc0000000 in hunk
-  type or size). Extended attributes in object files seem inofficial,
+  type or size). Extended attributes in object files seem unofficial,
   but supported by vasm now.
 o (ados/ehf) Allow memory flags with HUNK_PPC_CODE in object files.
 o (ados/ehf) Support HUNK_RELRELOC32 in executables (since OS3.0).
@@ -318,18 +345,18 @@ o (elf) Fixed an error when creating executables with the default 2-segment
 
 - 0.12d (05.05.09)
 o (a.out) New format aoutnull, which is the default format with undefined
-  endianess and standard relocations, when an object with MID 0 is read.
+  endianness and standard relocations, when an object with MID 0 is read.
 o (a.out) New format aoutjaguar, which recognizes swapped 16-bit words
   and generates a special relocation for the Jaguar GPU MOVEI RISC
   instruction (indicated by a set COPY flag in the reloc-info field).
 o (a.out) Detects Jaguar GPU MOVEI relocations in objects with MID 0
   and treats them accordingly to write a correct desintation file.
-o When none of the input files sets a valid endianess use the endianess
-  of the output file format. When the endianess is still unknown, guess
-  it by using the endianess of the host system.
-o New options -EB and -EL to define the endianess for reading input files
+o When none of the input files sets a valid endianness use the endianness
+  of the output file format. When the endianness is still unknown, guess
+  it by using the endianness of the host system.
+o New options -EB and -EL to define the endianness for reading input files
   and writing the output. Useful when neither the input files nor the
-  output file defines a valid endianess.
+  output file defines a valid endianness.
 o New option -minalign sets a minimum alignment (number of bits which have
   to be zero) for all imported sections. The specified alignment value will
   only take effect when higher than the section's current alignment.
@@ -348,7 +375,7 @@ o (ados/ehf) LoadSeg<=V40 doesn't allow more than 31 longwords per symbol
 - 0.12a (31.01.09)
 o V0.12 tried to prefer symbols resolved by the same object unit as it was
   referenced from. Unfortunately its implementation was wrong: it actually
-  prefered symbols which are not from the same object! Fixed.
+  preferred symbols which are not from the same object! Fixed.
 o Error message 36 was displayed as "UNUSED" although still needed.
 
 - 0.12 (07.12.08)
@@ -520,13 +547,13 @@ o Linker scripts: NOLOAD was not reset for the following sections.
 o New option -fixunnamed assigns a default name according to the
   section's type (.text, .data or .bss).
 o Option -u is supported. It allows to mark symbols as undefined, which
-  might trigger linking of addtional modules from standard libraries.
+  might trigger linking of additional modules from standard libraries.
 o Linker script command EXTERN, equivalent to the -u option. But you may
   specify several symbols with one EXTERN command.
 
 - 0.9g (05.12.04)
 o (elf) Start address of a non-default PHDR was wrong, so it would never
-  receive any sections (only occured when using PHDR directive).
+  receive any sections (only occurred when using PHDR directive).
 o (elf32ppc) Changed default page alignment from 0x1000 to 0x10000.
 o (ados/ehf) Sign-extend hunk symbol-values. Otherwise negative absolute
   symbols will not pass the linker's range-check.
@@ -552,7 +579,7 @@ o When linking an executable without linker script it could happen in
 o The map-file includes a nice section-mapping output now.
 o -sd option didn't work! Was treated as -sc!
 o Fixed small code (-sc) mode.
-o (ados/ehf) Some inofficial, currently pasm-only, reference types
+o (ados/ehf) Some unofficial, currently pasm-only, reference types
   were implemented, to be able to support base-relative references to
   common symbols in hunk format.
 
@@ -635,7 +662,7 @@ o New option -n disables page alignment in final executable.
 o New option -q keeps relocations in the final executable.
 o Options -dn,-dy,-dp,-dc are obsolete. There is only -d for allocation
   of common symbols (-dc will be recognized too).
-o New constructor/destructor handling, controled by linker-script commands
+o New constructor/destructor handling, controlled by linker-script commands
   (CONSTRUCTORS, VBCC_CONSTRUCTORS, etc.) or command line option -C.
   The linker will label constructor lists with __CTOR_LIST__ and destructor
   lists with __DTOR_LIST__ (available for all targets).
@@ -663,8 +690,8 @@ o Warnings about modified section-attributes and alignment were improved
 - 0.8k (23.02.03)
 o (ados/ehf) -P option should be supported now.
 o (ados/ehf) Stripping of local symbols from the final executable supported:
-  -x strips alls local symbols, -X only those starting with 'l', 'L' or '.'.
-o (ados/ehf) The line debug hunks can also be stripped seperately from an
+  -x strips all local symbols, -X only those starting with 'l', 'L' or '.'.
+o (ados/ehf) The line debug hunks can also be stripped separately from an
   executable by specifying -S, retaining the symbol names in HUNK_SYMBOL
   (which would not be stripped before -s).
 o (a.out) Fixed -X option. Stripping of all local symbols which start with
@@ -786,7 +813,7 @@ o (elf) Common symbol references are recognized. There are still problems
 o First mini support for linker scripts. They can be specified by using
   the new option -T. Linker scripts will allow to create executables
   for ELF (and other Unix targets) in future.
-o New targets "rawbin1" and "rawbin2", which genereate an absolute
+o New targets "rawbin1" and "rawbin2", which generate an absolute
   raw binary file. The base address is generally specified by using
   a linker script (-T option). The difference between the two is, that
   rawbin2 creates a separate file for every section.
@@ -816,7 +843,7 @@ o Compiles now under Irix 5.3.
 
 - 0.6a (19.12.98)
 o vlink should be prepared to support little-endian objects now. The
-  endianess of the whole linking procedure is determined when loading
+  endianness of the whole linking procedure is determined when loading
   the first object file. Consequently the following ones must use the same.
 o Fixed some problems with constructor/destructor-type linker symbols in
   small data mode. Although they were addressed base-relative, their
@@ -936,7 +963,7 @@ o First version, which reliably links ELF32-PowerPC-BigEndian relocatable
 o Support for SystemV-style and BSD-style ".a"-archives.
 o (elf32ppc) Resolving ADDR16_HA/HI/LO references to a relocatable
   symbol didn't work (2 bytes of the next instructions were overwritten).
-o Fixed the print routine for function names, in which an error occured.
+o Fixed the print routine for function names, in which an error occurred.
   It didn't work, if symbols had a known size. Additionally, it can
   differentiate between 'no type', 'function' and 'object' now.
 o Option -R directs vlink to generate short relocs, if the target format

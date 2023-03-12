@@ -1,8 +1,8 @@
-/* $VER: vlink t_rawbin.c V0.16h (20.04.21)
+/* $VER: vlink t_rawbin.c V0.16i (31.01.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -36,7 +36,7 @@ enum {
   HDR_JAGSRV,
   HDR_ORICMC,
   HDR_QDOS,
-  HDR_XTCC,
+  HDR_XTCC
 };
 
 /* binary relocs (-q) */
@@ -165,7 +165,7 @@ struct FFFuncs fff_rawbin1 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   0,  /* addr_bits from input */
   0,  /* ptr-alignment unknown */
   FFF_SECTOUT|FFF_KEEPRELOCS
@@ -197,7 +197,7 @@ struct FFFuncs fff_rawbin2 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   0,  /* addr_bits from input */
   0,  /* ptr-alignment unknown */
   FFF_SECTOUT|FFF_KEEPRELOCS
@@ -601,7 +601,7 @@ struct FFFuncs fff_srec19 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   16,
   0,  /* ptr-alignment unknown */
   FFF_NOFILE
@@ -633,7 +633,7 @@ struct FFFuncs fff_srec28 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   32, /* 24 */
   0,  /* ptr-alignment unknown */
   FFF_NOFILE
@@ -665,7 +665,7 @@ struct FFFuncs fff_srec37 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   32,
   0,  /* ptr-alignment unknown */
   FFF_NOFILE
@@ -697,7 +697,7 @@ struct FFFuncs fff_ihex = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   0,  /* addr_bits from input */
   0,  /* ptr-alignment unknown */
   FFF_NOFILE
@@ -729,7 +729,7 @@ struct FFFuncs fff_shex1 = {
   0,
   0,
   RTAB_UNDEF,0,
-  -1, /* endianess undefined, only write */
+  -1, /* endianness undefined, only write */
   32,
   0,  /* ptr-alignment unknown */
   FFF_NOFILE
@@ -762,8 +762,8 @@ static int sincql_options(struct GlobalVars *gv,
   else if (!strcmp(argv[*i],"-xtcc"))
     sincqlhdr = HDR_XTCC;
   else if (!strncmp(argv[*i],"-stack=",7)) {
-    sscanf(&argv[*i][7],"%lli",&val);
-    stacksize = val;
+    if (sscanf(&argv[*i][7],"%lli",&val) == 1)
+      stacksize = val;
   }
   else
     return 0;
@@ -936,7 +936,7 @@ static void amsdos_header(FILE *f,uint16_t loadaddr,unsigned size)
   buffer[23] = 0xff;                    /* 23     : 0xFF */
   write16le(&buffer[24],size);          /* 24 > 25: logical length */
   write16le(&buffer[26],execaddr);      /* 26 > 27: entry point */
-  write32le(&buffer[63],size);          /* 64 > 66: filesize (3 bytes) */
+  write32le(&buffer[64],size);          /* 64 > 66: filesize (3 bytes) */
   for (checksum=0,i=0; i<67; i++)
     checksum += buffer[i];
   write16le(&buffer[67],checksum);      /* 67 > 68: checksum */
@@ -1103,11 +1103,7 @@ static void rawbin_trailer(struct GlobalVars *gv,FILE *f,
   }
   if (header==HDR_XTCC || (header == HDR_QDOS && rewindtohdr(f))) {
     fwrite32be(f,(uint32_t)(relocsize+64>udatasize+stacksize?
-                            relocsize+64:udatasize+stacksize));
-  }
-  if (header == HDR_QDOS) {
-    fseek(f,0,SEEK_END);
-    even_padding(f);  /* make sure we have an even number of bytes */
+                            ((relocsize+65)&~1):udatasize+stacksize));
   }
 #endif
 }
@@ -1132,30 +1128,32 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
 
   /* section loop */
   while (ls = load_next_section(gv)) {
-    if (ls->size==0 || !(ls->flags & SF_ALLOC) || (ls->ld_flags & LSF_NOLOAD))
-      continue;  /* ignore empty or unallocated sections */
+    if (ls->ld_flags & LSF_NOLOAD)
+      continue;  /* do not output no-load sections */
 
     if (gv->output_sections) {
-      /* make a new file for each output section */
-      if (gv->trace_file)
-        fprintf(gv->trace_file,"Base address section %s = 0x%08lx.\n",
-                ls->name,ls->copybase);
-      if (f != NULL)
-        ierror("%sopen file with output_sections",fn);
-      if (gv->osec_base_name != NULL) {
-        /* use a common base name before the section name */
-        name = alloc(strlen(gv->osec_base_name)+strlen(ls->name)+2);
-        sprintf(name,"%s.%s",gv->osec_base_name,ls->name);
+      if (ls->size != 0) {
+        /* make a new file for each output section */
+        if (gv->trace_file)
+          fprintf(gv->trace_file,"Base address section %s = 0x%08lx.\n",
+                  ls->name,ls->copybase);
+        if (f != NULL)
+          ierror("%sopen file with output_sections",fn);
+        if (gv->osec_base_name != NULL) {
+          /* use a common base name before the section name */
+          name = alloc(strlen(gv->osec_base_name)+strlen(ls->name)+2);
+          sprintf(name,"%s.%s",gv->osec_base_name,ls->name);
+        }
+        else
+          name = (char *)ls->name;
+        if (!(f = fopen(name,"wb"))) {
+          error(29,name);
+          break;
+        }
+        if (gv->osec_base_name != NULL)
+          free(name);
+        rawbin_fileheader(gv,f,ls,header);
       }
-      else
-        name = (char *)ls->name;
-      if (!(f = fopen(name,"wb"))) {
-        error(29,name);
-        break;
-      }
-      if (gv->osec_base_name != NULL)
-        free(name);
-      rawbin_fileheader(gv,f,ls,header);
     }
     else if (firstsec) {
       /* write an optional header before the first section */
@@ -1248,13 +1246,17 @@ static void rawbin_writeexec(struct GlobalVars *gv,FILE *f,bool singlefile,
       }
     }
 
-    /* resolve all (remaining) relocations */
-    calc_relocs(gv,ls);
+    addr = ls->copybase;
 
-    /* write section contents */
-    fwritefullsect(gv,f,ls);
+    if (ls->flags & SF_ALLOC) {
+      /* resolve all (remaining) relocations */
+      calc_relocs(gv,ls);
 
-    addr = ls->copybase + ls->size;
+      /* write section contents */
+      fwritefullsect(gv,f,ls);
+      addr += ls->size;
+    }
+
     prevls = ls;
   }
 
@@ -1322,7 +1324,7 @@ static void rawbin_writesingle(struct GlobalVars *gv,FILE *f)
 
 #ifdef RAWBIN2
 static void rawbin_writemultiple(struct GlobalVars *gv,FILE *f)
-/* creates raw-binary which might get splitted over several */
+/* creates raw-binary which might get split over several */
 /* files, because of different section base addresses */
 {
   rawbin_writeexec(gv,f,FALSE,HDR_NONE);
@@ -1443,6 +1445,8 @@ static void sincql_write(struct GlobalVars *gv,FILE *f)
   }
   if (!stacksize)
     stacksize = 4096;  /* default */
+  if ((udatasize + stacksize) & 1)
+    ++udatasize;  /* make sure bss-segment has an even number of bytes */
   rawbin_writeexec(gv,f,TRUE,sincqlhdr);
 }
 #endif

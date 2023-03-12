@@ -3,6 +3,7 @@
 TARGET = vlink_os4
 DIR = AmigaOS4
 MD = makedir
+RM = delete force quiet
 
 CC = vc +aosppc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

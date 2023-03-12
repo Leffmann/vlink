@@ -1,8 +1,8 @@
-/* $VER: vlink t_aout.c V0.15e (23.03.17)
+/* $VER: vlink t_aout.c V0.16i (14.11.21)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2021  Frank Wille
  */
 
 #include "config.h"
@@ -505,13 +505,14 @@ static void aout_newreloc(struct GlobalVars *gv,struct aout_hdr *hdr,
       case N_DATA:
         if (!(rsec = find_sect_type(ou,ST_DATA,SP_READ|SP_WRITE)))
           ierror("%sno .data for reloc found",fn);
-        rsaddr = read32(be,hdr->a_text);
+        rsaddr = rtype==R_SD ? 0 : read32(be,hdr->a_text);
         break;
 
       case N_BSS:
         if (!(rsec = find_sect_type(ou,ST_UDATA,SP_READ|SP_WRITE)))
           ierror("%sno .bss for reloc found",fn);
-        rsaddr = read32(be,hdr->a_text) + read32(be,&hdr->a_data);
+        rsaddr = rtype==R_SD ? read32(be,&hdr->a_data) :
+                 read32(be,hdr->a_text) + read32(be,&hdr->a_data);
         break;
 
       default:
@@ -652,8 +653,8 @@ void aoutstd_relocs(struct GlobalVars *gv,struct ObjectUnit *ou,
         /* MID 0 and 32-bit COPY reloc may indicate a Jaguar GPU
            MOVEI RISC-instruction, which has swapped 16-bit words */
         rtype = R_AOUT_MOVEI;
-        if (gv->endianess < 0)
-          gv->endianess = _BIG_ENDIAN_;  /* Jaguar is big-endian */
+        if (gv->endianness < 0)
+          gv->endianness = _BIG_ENDIAN_;  /* Jaguar is big-endian */
       }
       else
         ierror("aoutstd_relocs(): %s (%s): Reloc type "
@@ -691,18 +692,18 @@ void aoutstd_read(struct GlobalVars *gv,struct LinkFile *lf,
   int be;
   struct ObjectUnit *u;
 
-  /* determine endianess */
-  if (fff[lf->format]->endianess < 0) {
-    if (gv->endianess < 0) {
-      /* unknown endianess, default to BE */
-      be = gv->endianess = host_endianess();
+  /* determine endianness */
+  if (fff[lf->format]->endianness < 0) {
+    if (gv->endianness < 0) {
+      /* unknown endianness, default to BE */
+      be = gv->endianness = host_endianness();
       error(128,lf->pathname,endian_name[be]);
     }
     else
-      be = gv->endianess;
+      be = gv->endianness;
   }
   else
-    be = fff[lf->format]->endianess;
+    be = fff[lf->format]->endianness;
 
   if (lf->type == ID_LIBARCH) {  /* check ar-member for correct format */
     if (!aout_check_ar_type(fff[lf->format],lf->pathname,hdr))
@@ -1060,11 +1061,18 @@ uint32_t aout_addrelocs(struct GlobalVars *gv,struct LinkedSection **ls,
         continue;  /* internal relocations will never be exported */
 
       /* fix addend for a.out and write into the section */
-      if (rel->rtype == R_PC)
+      if (rel->rtype == R_SD) {
+        /* GNU-binutiles (Amiga 68k) compatible implementation, .data-based */
+        if (rsec==2 && ls[1]!=NULL && ls[2]!=NULL)
+          a = (lword)(ls[2]->base - ls[1]->base) + rel->addend;  /* .bss */
+        else
+          a = rel->addend;  /* .data */
+      }
+      else if (rel->rtype == R_PC)
         a = rel->addend - ((lword)ls[sec]->base + rel->offset);
       else
         a = (lword)ls[rsec]->base + rel->addend;
-      /* @@@ calculation for other relocs: baserel,jmptab,load-relative? */
+      /* @@@ calculation for other relocs: jmptab,load-relative? */
 
       writesection(gv,ls[sec]->data,rel->offset,rel,a);
 
@@ -1135,7 +1143,7 @@ static void check_overlap(struct GlobalVars *gv,struct LinkedSection *ls1,
 
 
 static bool isPIC(struct LinkedSection **secs)
-/* check if all sections contain position independant code (PIC) */
+/* check if all sections contain position independent code (PIC) */
 {
   int i;
 
@@ -1254,13 +1262,13 @@ static uint32_t aoutstd_getrinfo(struct GlobalVars *gv,struct Reloc *rel,
 /* as used by M68k and x86 targets, */
 /* return ~0 when this relocation has to be ignored */
 {
-  int be = fff[gv->dest_format]->endianess;
+  int be = fff[gv->dest_format]->endianness;
   struct RelocInsert *ri,*ri2;
   uint32_t s=4,r=0;
   int b=0;
 
   if (be < 0)
-    be = gv->endianess;
+    be = gv->endianness;
 
   if (ri = rel->insert) {
     switch (rel->rtype) {
@@ -1319,13 +1327,13 @@ void aoutstd_writeobject(struct GlobalVars *gv,FILE *f)
 /* creates a standard a.out relocatable object file */
 {
   uint32_t mid = fff[gv->dest_format]->id;
-  int be = (int)fff[gv->dest_format]->endianess;
+  int be = (int)fff[gv->dest_format]->endianness;
   struct LinkedSection *sections[3];
   uint32_t trsize,drsize;
   unsigned long a = MIN_ALIGNMENT;
 
   if (be < 0)
-    be = gv->endianess;
+    be = gv->endianness;
   aout_initwrite(gv,sections);
   aout_addsymlist(gv,sections,BIND_GLOBAL,0,be);
   aout_addsymlist(gv,sections,BIND_WEAK,0,be);
@@ -1361,11 +1369,11 @@ void aoutstd_writeexec(struct GlobalVars *gv,FILE *f)
 /* creates a standard a.out paged executable file */
 {
   uint32_t mid = fff[gv->dest_format]->id;
-  int be = (int)fff[gv->dest_format]->endianess;
+  int be = (int)fff[gv->dest_format]->endianness;
   struct LinkedSection *sections[3];
 
   if (be < 0)
-    be = gv->endianess;
+    be = gv->endianness;
   aout_initwrite(gv,sections);
   if (sections[0] == NULL)  /* this requires a .text section! */
     error(97,fff[gv->dest_format]->tname,TEXTNAME);

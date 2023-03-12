@@ -3,6 +3,7 @@
 TARGET = vlink.ttp
 DIR = TOS
 MD = mkdir
+RM = rm -f
 
 CC = vc +tos
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "

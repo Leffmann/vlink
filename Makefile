@@ -3,10 +3,11 @@
 TARGET = vlink
 DIR = objects
 MD = mkdir
+RM = rm -f
 
 CC = gcc
 CCOUT = -o $(DUMMYVARIABLE)	# produces the string "-o "
-COPTS = -std=c99 -Wpedantic -O2 -fomit-frame-pointer -c
+COPTS = -std=c99 -pedantic -O2 -fomit-frame-pointer -c
 CONFIG =
 
 LD = $(CC)

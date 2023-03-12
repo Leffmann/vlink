@@ -1,8 +1,8 @@
-/* $VER: vlink main.c V0.16h (14.04.21)
+/* $VER: vlink main.c V0.16i (31.01.22)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2021  Frank Wille
+ * Copyright (c) 1997-2022  Frank Wille
  */
 
 
@@ -163,7 +163,7 @@ int main(int argc,const char *argv[])
   gv->dynamic = TRUE;  /* link with dynamic libraries first */
   gv->interp_path = DEFAULT_INTERP_PATH;
   gv->soname = NULL;
-  gv->endianess = -1;  /* endianess is unknown */
+  gv->endianness = -1;  /* endianness is unknown */
 
   /* initialize targets */
   for (j=0; fff[j]; j++) {
@@ -197,37 +197,49 @@ int main(int argc,const char *argv[])
     exit(EXIT_SUCCESS);
   }
 
+  /* first determine the destination file format */
+  for (i=1; i<argc; i++) {
+    if (argv[i][0]=='-' && argv[i][1]=='b') {
+      int ii = i;
+
+      if (buf = get_option_arg(argc,argv,&i)) {
+        /* for compatibility with older vlink versions,
+           elf32amiga is automatically converted into elf32powerup
+           and amigaos into amigahunk */
+        if (!strcmp(buf,"elf32amiga"))
+          buf = "elf32powerup";
+        else if (!strcmp(buf,"amigaos"))
+          buf = "amigahunk";
+        for (j=0; fff[j]; j++) {
+          if (!strcmp(fff[j]->tname,buf))
+            break;
+        }
+        if (fff[j]) {
+          gv->dest_format = (uint8_t)j;
+          argv[ii] = argv[i] = NULL;  /* delete option for next pass */
+        }
+      }
+    }
+  }
+
   for (i=1; i<argc; i++) {
 
-    if (*argv[i] == '-') {  /* option detected */
+    if (argv[i] == NULL) {
+      continue;
+    }
+    else if (*argv[i] == '-') {  /* option detected */
       switch (argv[i][1]) {
 
         case 'b':  
           if (!strcmp(&argv[i][2],"aseoff")) {  /* set base-relative offset */
             long bo;
 
-            sscanf(get_arg(argc,argv,&i),"%li",&bo);
-            fff[gv->dest_format]->baseoff = bo;
+            if (sscanf(get_arg(argc,argv,&i),"%li",&bo) == 1)
+              fff[gv->dest_format]->baseoff = bo;
           }
-          else {  /* select target format */
-            if (buf = get_option_arg(argc,argv,&i)) {
-              /* for compatibility with older vlink versions,
-                 elf32amiga is automatically converted into elf32powerup
-                 and amigaos into amigahunk */
-              if (!strcmp(buf,"elf32amiga"))
-                buf = "elf32powerup";
-              else if (!strcmp(buf,"amigaos"))
-                buf = "amigahunk";
-              for (j=0; fff[j]; j++) {
-                if (!strcmp(fff[j]->tname,buf))
-                  break;
-              }
-              if (fff[j])
-                gv->dest_format = (uint8_t)j;
-              else
-                error(9,buf);  /* invalid target format */
-            }
-          }
+          else if (!strncmp(&argv[i][2],"roken",5))
+            goto unknown;
+          error(9,buf);  /* invalid target format */
           break;
 
         case 'c':
@@ -325,8 +337,8 @@ int main(int argc,const char *argv[])
           else if (!strcmp(&argv[i][2],"inalign")) {
             long a;
 
-            sscanf(get_arg(argc,argv,&i),"%li",&a);
-            gv->min_alignment = (uint8_t)a;
+            if (sscanf(get_arg(argc,argv,&i),"%li",&a) == 1)
+              gv->min_alignment = (uint8_t)a;
           }
           else if (!strcmp(&argv[i][2],"rel"))
             gv->auto_merge = TRUE;
@@ -346,8 +358,8 @@ int main(int argc,const char *argv[])
             stdlib = FALSE;
           else if (!strncmp(&argv[i][2],"owarn=",6)){
             int wno;
-            sscanf(argv[i]+8,"%i",&wno);
-            disable_warning(wno);
+            if (sscanf(argv[i]+8,"%i",&wno) == 1)
+              disable_warning(wno);
           }
           else goto unknown;
           break;
@@ -518,13 +530,13 @@ int main(int argc,const char *argv[])
           }
           break;
 
-        case 'E':  /* set endianess */
+        case 'E':  /* set endianness */
           switch (argv[i][2]) {
             case 'B':
-              gv->endianess = _BIG_ENDIAN_;
+              gv->endianness = _BIG_ENDIAN_;
               break;
             case 'L':
-              gv->endianess = _LITTLE_ENDIAN_;
+              gv->endianness = _LITTLE_ENDIAN_;
               break;
             default:
               goto unknown;
@@ -586,8 +598,8 @@ int main(int argc,const char *argv[])
             if (i+1 < argc) {
               long long tmp;
 
-              sscanf(argv[++i],"%lli",&tmp);
-              gv->start_addr = tmp;
+              if (sscanf(argv[++i],"%lli",&tmp) == 1)
+                gv->start_addr = tmp;
             }
             else
               error(5,'T');  /* option requires argument */

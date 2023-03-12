@@ -69,7 +69,7 @@ typedef int bool;
 
 #define MAXLEN 256		/* maximum length for symbols and buffers */
 #define FNAMEBUFSIZE 1024       /* buffer size for file names */
-#define MAX_FWALIGN 8192        /* max. aligment, when writing target file */
+#define MAX_FWALIGN 8192        /* max. alignment, when writing target file */
 
 /* macros */
 #define SECNAMECMP(s1,s2)       ((s1)->hash==(s2)->hash ? \
@@ -196,7 +196,7 @@ struct Section {
   struct LinkedSection *lnksec; /* ptr to joined sections */
   const char *name;             /* section's name, e.g. .text, .data, ... */
   unsigned long hash;           /* section name's hash code */
-  uint32_t id;                  /* unique section id - target dependant */
+  uint32_t id;                  /* unique section id - target dependent */
   uint8_t type;                 /* type: code, data, bss */
   uint8_t flags;
   uint8_t protection;           /* readable, writable, executable, ... */
@@ -229,7 +229,7 @@ struct Section {
 #define SF_SMALLDATA       0x04 /* section is referenced base-relative */
 #define SF_LINKONCE        0x08 /* link only a single section with this name */
 #define SF_REFERENCED      0x10 /* section was referenced */
-#define SF_PORTABLE_MASK   0x1f /* mask for target-independant flags */
+#define SF_PORTABLE_MASK   0x1f /* mask for target-independent flags */
 /* target specific section flags: amiga */
 #define SF_EHFPPC          0x20  /* target ehf: section contains PPC code */
 
@@ -426,7 +426,7 @@ struct LinkedSection {          /* linked sections of same type and name */
   unsigned long copybase;       /* section's virtual copy address (destmem) */
   unsigned long base;           /* the section's virtual address (relocmem) */
   unsigned long size;           /* the section's size in bytes */
-  unsigned long filesize;       /* size in file, rest ist filled with '0' */
+  unsigned long filesize;       /* size in file, rest is filled with '0' */
   unsigned long gapsize;        /* bytes to fill until next section */
   struct list sections;         /* s. which have been linked together */
   uint8_t *data;                /* the section's contents */
@@ -557,7 +557,7 @@ struct GlobalVars {
   struct Section *dummysec;     /* contains nothing, has base addr. 0 */
   struct Phdr *phdrlist;        /* list of defined PHDRs (ELF only) */
   uint16_t filldata;            /* used to fill alignment-gaps */
-  int8_t endianess;             /* linking in big endian mode (1), */
+  int8_t endianness;             /* linking in big endian mode (1), */
                                 /*  little endian (0), undefined (-1) */
   uint8_t collect_ctors_type;   /* method to collect constructors */
   const char *collect_ctors_secname; /* default section name for construct. */
@@ -580,7 +580,7 @@ struct GlobalVars {
 #define TRSYMHTABSIZE 0x40
 #define DEFAULT_INTERP_PATH "/usr/lib/ld.so.1"
 
-/* endianess */
+/* endianness */
 #define _LITTLE_ENDIAN_ (0)
 #define _BIG_ENDIAN_ (1)
 
@@ -660,7 +660,7 @@ struct FFFuncs {                /* file format specific functions and data */
   uint32_t id;                  /* general purpose id (e.g. MID for a.out) */
   uint8_t rtab_format;          /* reloc-table format (GV.reloctab_format) */
   uint8_t rtab_mask;            /* mask of allowed reloc-table formats */
-  int8_t endianess;             /* 1=bigEndian, 0=littleEndian */
+  int8_t endianness;             /* 1=bigEndian, 0=littleEndian */
   int8_t addr_bits;             /* bits in a target address (16, 32, 64) */
   uint8_t ptr_alignment;        /* minimum alignment for pointers */
   uint32_t flags;               /* general and target-family specific flags */
@@ -765,7 +765,7 @@ char *mapfile(const char *);
 const char *base_name(const char *);
 char *check_name(char *);
 bool checkrange(lword,bool,int);
-int8_t host_endianess(void);
+int8_t host_endianness(void);
 uint16_t swap16(uint16_t);
 uint32_t swap32(uint32_t);
 uint64_t swap64(uint64_t);

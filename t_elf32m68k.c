@@ -71,7 +71,7 @@ static int m68k_identify(struct GlobalVars *gv,char *name,uint8_t *p,
 
 static uint8_t m68k_reloc_elf2vlink(uint8_t rtype,struct RelocInsert *ri)
 /* Determine vlink internal reloc type from ELF reloc type and fill in
-   reloc-insert description informations.
+   reloc-insert description information.
    All fields of the RelocInsert structure are preset to zero. */
 {
   static struct ELF2vlink convertV4[] = {
@@ -188,7 +188,7 @@ static uint8_t m68k_reloc_vlink2elf(struct Reloc *r)
 
 
 static void m68k_writeshared(struct GlobalVars *gv,FILE *f)
-/* creates a target-elf32m68k shared object (which is pos. independant) */
+/* creates a target-elf32m68k shared object (which is pos. independent) */
 {
   ierror("m68k_writeshared(): Shared object generation has not "
          "yet been implemented");

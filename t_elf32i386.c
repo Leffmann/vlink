@@ -120,7 +120,7 @@ static int i386_identify(struct GlobalVars *gv,char *name,uint8_t *p,
 
 static uint8_t i386_reloc_elf2vlink(uint8_t rtype,struct RelocInsert *ri)
 /* Determine vlink internal reloc type from ELF reloc type and fill in
-   reloc-insert description informations.
+   reloc-insert description information.
    All fields of the RelocInsert structure are preset to zero. */
 {
   /* Reloc conversion table for V.4-ABI */
@@ -321,7 +321,7 @@ static uint8_t i386_reloc_vlink2elf(struct Reloc *r)
 #ifdef ELF32_386
 
 static void i386_writeshared(struct GlobalVars *gv,FILE *f)
-/* creates a target-elf32i386 shared object (which is pos. independant) */
+/* creates a target-elf32i386 shared object (which is pos. independent) */
 {
   ierror("i386_writeshared(): Shared object generation has not "
          "yet been implemented");
@@ -347,7 +347,7 @@ static void i386_writeexec(struct GlobalVars *gv,FILE *f)
 #ifdef ELF32_AROS
 
 static void aros_writeshared(struct GlobalVars *gv,FILE *f)
-/* creates a target-elf32aros shared object (which is pos. independant) */
+/* creates a target-elf32aros shared object (which is pos. independent) */
 {
   ierror("aros_writeshared(): Shared object generation has not "
          "yet been implemented");

@@ -31,7 +31,7 @@ struct Section *elfpltrelocs;
 uint32_t elfshdridx,elfsymtabidx,elfshstrtabidx,elfstrtabidx;
 uint32_t elfoffset;             /* current ELF file offset */
 unsigned long elf_file_hdr_gap; /* gap between hdr and first segment */
-int8_t elf_endianess = -1;      /* used while creating output-file */
+int8_t elf_endianness = -1;      /* used while creating output-file */
 
 /* ELF section names */
 const char note_name[] = ".note";
@@ -557,8 +557,8 @@ struct Section *elf_initdynlink(struct GlobalVars *gv)
   struct Symbol *sym;
   struct Section *dynsec;
 
-  /* set endianess for output file */
-  elf_endianess = fff[gv->dest_format]->endianess;
+  /* set endianness for output file */
+  elf_endianness = fff[gv->dest_format]->endianness;
 
   /* init dynamic symbol list */
   initlist(&elfdynsymlist);
@@ -592,7 +592,7 @@ struct Symbol *elf_pltgotentry(struct GlobalVars *gv,struct Section *sec,
                                int etype,bool relaflag,
                                size_t relocsize,size_t addrsize)
 /* Make a table entry for indirectly accessing a location from an external
-   symbol defintion (GOT_ENTRY/PLT_ENTRY) or a local relocation (GOT_LOCAL).
+   symbol definition (GOT_ENTRY/PLT_ENTRY) or a local relocation (GOT_LOCAL).
    The entry has a size of offsadd bytes, while the table section sec will
    become sizeadd bytes larger per entry. */
 {
@@ -627,7 +627,7 @@ struct Symbol *elf_pltgotentry(struct GlobalVars *gv,struct Section *sec,
 
     tabsym = findlocsymbol(gv,sec->obj,entryname);
     if (tabsym == NULL) {
-      ierror("%s %s-symbol refering to %s+%lx disappeared",
+      ierror("%s %s-symbol referring to %s+%lx disappeared",
              fn,sec->name,refsec->name,refoffs);
     }
 
@@ -907,7 +907,7 @@ uint32_t elf_addsym(struct SymTabList *sl,const char *name,uint64_t value,
 
   /* initialize ELF symbol */
   sl->initsym(sym,elf_addstrlist(sl->strlist,name),value,size,
-              bind,type,shndx,elf_endianess==_BIG_ENDIAN_);
+              bind,type,shndx,elf_endianness==_BIG_ENDIAN_);
 
   return sn->index;
 }
@@ -1361,11 +1361,11 @@ size_t elf_addrela(struct GlobalVars *gv,struct LinkedSection *ls,
       
 
 void elf_initoutput(struct GlobalVars *gv,
-                    uint32_t init_file_offset,int8_t output_endianess)
+                    uint32_t init_file_offset,int8_t output_endianness)
 /* initialize section header, program header, relocation, symbol, */
 /* string and section header string lists */
 {
-  elf_endianess = output_endianess;
+  elf_endianness = output_endianness;
   elfoffset = init_file_offset;
   elf_file_hdr_gap = 0;
 

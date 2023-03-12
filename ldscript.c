@@ -1807,7 +1807,7 @@ static bool parse_pattern(struct GlobalVars *gv,char *keyword,
 static struct Section *make_data_element(struct GlobalVars *gv)
 /* Construct a section for a new data element (BYTE, SHORT, ...) */
 {
-  bool be = gv->endianess == _BIG_ENDIAN_;
+  bool be = gv->endianness == _BIG_ENDIAN_;
   uint8_t *data = alloc(datasize);
   struct Section *sec;
   const char *name;

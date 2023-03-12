@@ -60,7 +60,7 @@
 #define ELF64_X86           /* ELF x86_64 64-Bit Little Endian */
 
 #define AOUT                /* general a.out support */
-#define AOUT_NULL           /* a.out stdandard relocs, undefined endianess */
+#define AOUT_NULL           /* a.out stdandard relocs, undefined endianness */
 #define AOUT_SUN010         /* a.out SunOS 68000/010 */
 #define AOUT_SUN020         /* a.out SunOS 68020+ */
 #define AOUT_BSDM68K        /* a.out NetBSD M68k (68020+) 8k Pages */
