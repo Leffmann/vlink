@@ -12,7 +12,7 @@
 @ifinfo
 This is the manual for the portable multi-format linker vlink.
 
-Copyright 1997-2019 Frank Wille
+Copyright 1997-2020 Frank Wille
 @end ifinfo
 
 @titlepage
@@ -42,7 +42,7 @@ Empty sections and other unused data are deleted to achieve a size-optimized
 output.
 
 @section Legal
-    vlink is copyright 1995-2019 by Frank Wille.
+    vlink is copyright 1995-2020 by Frank Wille.
 
     This archive may be redistributed without modifications and used
     for non-commercial purposes.
@@ -303,11 +303,12 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
   [-e entrypoint] [-export-dynamic] [-f flavour] [-fixunnamed]
   [-F filename] [-gc-all] [-gc-empty] [-hunkattr secname=value]
   [-interp path] [-L library-search-path] [-l library-specifier]
-  [-minalign val] [-mrel] [-mtype] [-multibase] [-nostdlib]
+  [-minalign val] [-mrel] [-mtype] [-multibase] [-nostdlib] [-N old new]
   [-o filename] [-rpath path] [-sc] [-sd] [-shared] [-soname name]
   [-static] [-T filename] [-Ttext addr] [-textbaserel]
   [-tos-flags/fastload/fastram/private/global/super/readable]
-  [-tos-textbased] [-u symbol] [-V version] [-y symbol] [-P symbol]
+  [-tos-textbased] [-u symbol] [-vicelabels filename]
+  [-V version] [-y symbol] [-P symbol]
   input-files...}
 @end example
 
@@ -483,9 +484,10 @@ the @option{-Bstatic} option is in effect, an archive of the form
 For @code{amigaos}/@code{amigaehf} file formats, the libraries are
 called @file{<spec>.lib}.
 
-@item -M
+@item -M[file name]
 Produce output about the mapping of sections of the input
 files and the values assigned to symbols in the output file.
+When the optional @code{file name} is missing output goes to stdout.
 
 @item -minalign alignment
 Set a minimum alignment (number of bits which have to be zero) for all
@@ -508,6 +510,12 @@ register.
 If this is not desired - maybe you have several base registers and
 small data sections - you can disable this behaviour by specifying
 @option{-multibase}.
+
+@item -N oldname newname
+Rename all input sections named @file{oldname} into @file{newname}.
+This setting is valid for all the following input files and libraries on
+the command line and can be disabled with @code{-N oldname oldname}.
+Multiple @option{-N} options are allowed.
 
 @item -n
 No page alignment of sections or segments in the final
@@ -588,8 +596,9 @@ section.
 
 @item -T script
 Specifies a linker script, which defines the absolute
-locations for every section. The syntax is very similar
-to that used in GNU linker scripts.
+locations for every section. The command language should be the same
+as that used in GNU linker scripts, although does not implement
+everything yet.
 Supported commands:
 @itemize @minus
   @item ASSERT
@@ -623,6 +632,8 @@ Supported functions:
   @item SIZEOF_HEADERS
   @item SORT
 @end itemize
+You find the full documentation for GNU linker scripts here:
+@uref{https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts, Linker Scripts}
 
 @item -Ttext addr
 Set the base address of the first section. It can be overridden by
@@ -685,6 +696,9 @@ Minimum major version of shared object to be linked behind this option.
 @item -v
 Prints @command{vlink} version string, default library search path
 and implemented target file formats.
+
+@item -vicelabels filename
+Generates a label address mapping file to the VICE debugger.
 
 @item -w
 Suppress all warning messages.
@@ -820,7 +834,7 @@ alphabetical order, probably not complete):
 @item %s line %d: Missing argument
 @item %s line %d: Undefined section: <%s>
 @item %s line %d: Section %s was assigned to more than one PT_LOAD segment
-@item First ELF segment (%s) doesn't contain first section (%s)
+@item Multiple use of section <%s> in linker script
 @item Intermediate uninitialized sections in ELF segment <%s> (first=<%s>, last=<%s>) will be turned into initialized
 @item Section <%s> (0x%llx-0x%llx) conflicts with ELF segment <%s> (currently: 0x%llx-0x%llx)
 @item %s: QMAGIC is deprecated and will no longer be supported

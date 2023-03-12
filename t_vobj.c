@@ -1,8 +1,8 @@
-/* $VER: vlink t_vobj.c V0.15b (08.07.16)
+/* $VER: vlink t_vobj.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2020 Frank Wille
  */
 
 #include "config.h"
@@ -99,7 +99,7 @@ struct FFFuncs fff_vobj_le = {
   0,
   RTAB_UNDEF,0,
   _LITTLE_ENDIAN_,
-  32
+  0  /* defined by VOBJ bytespertaddr*8 */
 };
 
 struct FFFuncs fff_vobj_be = {
@@ -126,7 +126,7 @@ struct FFFuncs fff_vobj_be = {
   0,
   RTAB_UNDEF,0,
   _BIG_ENDIAN_,
-  32
+  0  /* defined by VOBJ bytespertaddr*8 */
 };
 
 
@@ -367,6 +367,8 @@ static void vobj_read(struct GlobalVars *gv,struct LinkFile *lf,uint8_t *data)
     /* n bytes per target-address are not supported */
     error(114,lf->pathname,fff[lf->format]->tname,bpt);
   }
+  if (bpt > (int)gv->bits_per_taddr)
+    gv->bits_per_taddr = bpt;  /* set bits per taddr from this VOBJ */
   skip_string();  /* skip cpu-string */
 
   u = create_objunit(gv,lf,lf->objname);

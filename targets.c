@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.16c (10.03.19)
+/* $VER: vlink targets.c V0.16d (16.10.19)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -172,6 +172,9 @@ const char r13init_name[] = "__r13_init";
 
 const char noname[] = "";
 
+
+/* current list of section-renamings */
+struct SecRename *secrenames;
 
 
 struct Symbol *findsymbol(struct GlobalVars *gv,struct Section *sec,
@@ -615,7 +618,7 @@ void fixlnksymbols(struct GlobalVars *gv,struct LinkedSection *def_ls)
             /* add to final output section */
             addtail(&sym->relsect->lnksec->symbols,&sym->n);
             if (gv->map_file)
-              print_symbol(gv->map_file,sym);
+              print_symbol(gv,gv->map_file,sym);
           }
         }
       }
@@ -1515,6 +1518,84 @@ struct SecAttrOvr *getsecattrovr(struct GlobalVars *gv,const char *name,
 }
 
 
+void addsecrename(const char *orgname,const char *newname)
+/* Create a new SecRename node and append it to the list. When a node
+   for the same input section name is already present, then reuse it.
+   When the new name matches the original name: remove the node. */
+{
+  struct SecRename *sr,*prev;
+
+  for (sr=secrenames,prev=NULL; sr!=NULL; sr=sr->next) {
+    if (!strcmp(sr->orgname,orgname))
+      break;
+    prev = sr;
+  }
+
+  if (sr != NULL) {
+    if (!strcmp(sr->orgname,newname)) {
+      /* renaming is disabled - remove that node */
+      if (prev)
+        prev->next = sr->next;
+      else
+        secrenames = sr->next;
+      free(sr);
+    }
+    else
+      sr->newname = newname;
+  }
+  else {
+    sr = alloc(sizeof(struct SecRename));
+    sr->next = NULL;
+    sr->orgname = orgname;
+    sr->newname = newname;
+    if (prev)
+      prev->next = sr;
+    else
+      secrenames = sr;
+  }
+}
+
+
+struct SecRename *getsecrename(void)
+/* Return a copy of the current section-renaming list. */
+{
+  struct SecRename *sr,*newsr,*srcopy,*srlast;
+
+  for (sr=secrenames,srcopy=NULL; sr!=NULL; sr=sr->next) {
+    newsr = alloc(sizeof(struct SecRename));
+    newsr->next = NULL;
+    newsr->orgname = sr->orgname;
+    newsr->newname = sr->newname;
+
+    if (srlast = srcopy) {
+      while (srlast->next != NULL)
+        srlast = srlast->next;
+      srlast->next = newsr;
+    }
+    else
+      srcopy = newsr;
+  }
+  return srcopy;
+}
+
+
+static const char *do_rename(struct SecRename *sr,const char *name)
+/* Find matching SecRename node and return the new name, if present.
+   Otherwise return the original name. */
+{
+  if (name != NULL) {
+    for (; sr!=NULL; sr=sr->next) {
+      if (!strcmp(sr->orgname,name))
+        return sr->newname;
+    }
+  }
+  else
+    return noname;
+
+  return name;
+}
+
+
 struct Section *create_section(struct ObjectUnit *ou,const char *name,
                                uint8_t *data,unsigned long size)
 /* creates and initializes a Section node */
@@ -1522,10 +1603,7 @@ struct Section *create_section(struct ObjectUnit *ou,const char *name,
   static uint32_t idcnt = 0;
   struct Section *s = alloczero(sizeof(struct Section));
 
-  if (name)
-    s->name = name;
-  else
-    s->name = noname;
+  s->name = do_rename(ou->lnkfile->renames,name);
   s->hash = elf_hash(s->name);
   s->data = data;
   s->size = size;

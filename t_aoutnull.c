@@ -75,7 +75,7 @@ struct FFFuncs fff_aoutnull = {
   0,
   RTAB_STANDARD,RTAB_STANDARD,
   -1,  /* endianess unknown */
-  32,
+  0,   /* addr_bits from input */
   FFF_BASEINCR
 };
 

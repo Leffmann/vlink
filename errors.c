@@ -1,8 +1,8 @@
-/* $VER: vlink errors.c V0.15e (23.03.17)
+/* $VER: vlink errors.c V0.16d (17.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -119,7 +119,7 @@ static struct {
   "%s line %d: Undefined section: <%s>",EF_ERROR,
   "%s line %d: Section %s was assigned to more than one PT_LOAD "   /* 80 */
     "segment",EF_ERROR,
-  "UNUSED First ELF segment (%s) doesn't contain first section (%s)",EF_FATAL,
+  "Multiple use of section <%s> in linker script",EF_FATAL,
   "Intermediate uninitialized sections in ELF segment <%s> (first=<%s>, "
     "last=<%s>) will be turned into initialized",EF_WARNING,
   "Section <%s> (0x%llx-0x%llx) conflicts with ELF segment <%s> "

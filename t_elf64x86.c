@@ -1,8 +1,8 @@
-/* $VER: vlink t_elf64x86.c V0.14 (24.06.11)
+/* $VER: vlink t_elf64x86.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2011  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -48,7 +48,7 @@ struct FFFuncs fff_elf64x86 = {
   0,
   RTAB_ADDEND,RTAB_STANDARD|RTAB_ADDEND,
   _LITTLE_ENDIAN_,
-  32
+  64
 };
 
 

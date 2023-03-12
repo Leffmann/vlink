@@ -1,8 +1,8 @@
-/* $VER: vlink main.c V0.16b (29.12.17)
+/* $VER: vlink main.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -13,7 +13,7 @@ struct GlobalVars gvars;
 
 
 
-static char *get_option_arg(int argc,char *argv[],int *i)
+static const char *get_option_arg(int argc,const char *argv[],int *i)
 /* get pointer to the string, which either directly follows the option
    character or is stored in the next argument */
 {
@@ -32,7 +32,7 @@ static char *get_option_arg(int argc,char *argv[],int *i)
 }
 
 
-static char *get_arg(int argc,char *argv[],int *i)
+static const char *get_arg(int argc,const char *argv[],int *i)
 {
   if ((*i+1)<argc && *argv[*i+1]!='-')
     return argv[++*i];
@@ -41,10 +41,10 @@ static char *get_arg(int argc,char *argv[],int *i)
 }
 
 
-static lword get_assign_arg(int argc,char *argv[],int *i,
+static lword get_assign_arg(int argc,const char *argv[],int *i,
                             char *name,size_t len)
 {
-  char *p = get_arg(argc,argv,i);
+  const char *p = get_arg(argc,argv,i);
   char *n = name;
   lword val;
 
@@ -67,13 +67,14 @@ static lword get_assign_arg(int argc,char *argv[],int *i,
 }
 
 
-static void  ReadListFile(struct GlobalVars *gv,char *name,uint16_t flags)
+static void ReadListFile(struct GlobalVars *gv,const char *name,uint16_t flags)
 /* read a file, which contains a list of object file names */
 {
-  FILE *f;
+  struct SecRename *renames = getsecrename();
   struct InputFile *ifn;
-  int c;
   char buf[256],*n=NULL;
+  FILE *f;
+  int c;
 
   if (f = fopen(name,"r")) {
     do {
@@ -106,6 +107,7 @@ static void  ReadListFile(struct GlobalVars *gv,char *name,uint16_t flags)
         ifn->name = allocstring(buf);
         ifn->lib = FALSE;
         ifn->flags = flags;
+        ifn->renames = renames;
         addtail(&gv->inputlist,&ifn->n);
         n = NULL;
       }
@@ -118,7 +120,7 @@ static void  ReadListFile(struct GlobalVars *gv,char *name,uint16_t flags)
 }
 
 
-static uint16_t chk_flags(char *s)
+static uint16_t chk_flags(const char *s)
 /* check for input-file flags */
 {
   if (!strcmp(s+5,"deluscore"))
@@ -144,11 +146,11 @@ void cleanup(struct GlobalVars *gv)
 }
 
 
-int main(int argc,char *argv[])
+int main(int argc,const char *argv[])
 {
   struct GlobalVars *gv = &gvars;
   int i,j;
-  char *buf;
+  const char *buf;
   struct LibPath *libp;
   struct InputFile *ifn;
   bool stdlib = TRUE;
@@ -257,11 +259,11 @@ int main(int argc,char *argv[])
             gv->fix_unnamed = TRUE;  /* assign a name to unnamed sections */
           }
           else {  /* set a flavour */
-            char *name,**fl;
+            const char *name,**fl;
 
             if (name = get_option_arg(argc,argv,&i)) {
               if (fl = gv->flavours.flavours) {
-                char **tmp = alloc((gv->flavours.n_flavours+1)*sizeof(char *));
+                const char **tmp = alloc((gv->flavours.n_flavours+1)*sizeof(char *));
 
                 memcpy(tmp,fl,gv->flavours.n_flavours*sizeof(char *));
                 free(fl);
@@ -325,6 +327,7 @@ int main(int argc,char *argv[])
             ifn->so_ver = so_version;
             so_version = 0;
             ifn->flags = flags;
+            ifn->renames = getsecrename();
             addtail(&gv->inputlist,&ifn->n);
           }
           break;
@@ -469,17 +472,24 @@ int main(int argc,char *argv[])
           break;
 
         case 'v':  /* show version and target info */
-          show_version();
-          printf("Standard library path: "
+          if (!strcmp(&argv[i][2],"icelabels") &&
+              (buf = get_arg(argc,argv,&i)) != NULL) {
+            gv->vice_file = fopen(buf,"w");
+          }
+          else {
+            show_version();
+            printf("Standard library path: "
 #ifdef LIBPATH
-                 LIBPATH
+                   LIBPATH
 #endif
-                 "\nDefault target: %s\n"
-                 "Supported targets:",fff[gv->dest_format]->tname);
-          for (j=0; fff[j]; j++)
-            printf(" %s",fff[j]->tname);
-          printf("\n");
-          exit(EXIT_SUCCESS);
+                   "\nDefault target: %s\n"
+                   "Supported targets:",fff[gv->dest_format]->tname);
+            for (j=0; fff[j]; j++)
+              printf(" %s",fff[j]->tname);
+            printf("\n");
+            exit(EXIT_SUCCESS);
+          }
+          break;
 
         case 'w':  /* suppress warnings */
           gv->dontwarn = TRUE;
@@ -572,7 +582,17 @@ int main(int argc,char *argv[])
           break;
 
         case 'M':  /* mapping output */
-          gv->map_file = stdout;
+          if (!argv[i][2] || (gv->map_file = fopen(&argv[i][2],"w"))==NULL)
+            gv->map_file = stdout;
+          break;
+
+        case 'N':  /* rename input sections */
+          if (i+2 < argc) {
+            addsecrename(argv[i+1],argv[i+2]);
+            i += 2;
+          }
+          else
+            error(5,argv[i][1]);
           break;
 
         case 'P':  /* protect symbol against stripping */
@@ -636,6 +656,7 @@ int main(int argc,char *argv[])
       ifn->name = argv[i];
       ifn->lib = FALSE;
       ifn->flags = flags;
+      ifn->renames = getsecrename();
       addtail(&gv->inputlist,&ifn->n);
     }
   }

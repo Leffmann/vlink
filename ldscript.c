@@ -1,8 +1,8 @@
-/* $VER: vlink ldscript.c V0.16a (07.07.17)
+/* $VER: vlink ldscript.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -1571,7 +1571,8 @@ static void add_section_to_segments(struct GlobalVars *gv,
         break;
     }
     if (*pp == NULL) {
-      if (p->start != ADDR_NONE)
+      if (p->start!=ADDR_NONE && p->vmregion==defmem && p->lmregion==defmem)
+        /* @@@ only close PHDRs wenn not using '>' into memory region ??? */
         p->flags |= PHDR_CLOSED;  /* close no longer used segment */
     }
   }
@@ -1703,7 +1704,7 @@ static bool parse_pattern(struct GlobalVars *gv,char *keyword,
 static struct Section *make_data_element(struct GlobalVars *gv)
 /* Construct a section for a new data element (BYTE, SHORT, ...) */
 {
-  bool be = fff[gv->dest_format]->endianess == _BIG_ENDIAN_;
+  bool be = gv->endianess == _BIG_ENDIAN_;
   uint8_t *data = alloc(datasize);
   struct Section *sec;
   const char *name;

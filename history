@@ -15,6 +15,26 @@ vlink history
 (xfile):      changes for the Sharp X68000 XFile format
 
 
+- 0.16d (18.04.20)
+o New option -N for renaming input sections.
+o New option -vicelabels to generate a label-address mapping for the
+  debugger from the VICE emulator.
+o -M option for generating map files accepts an optional output file name.
+o Map files prints all symbols per section sorted by value. The values
+  are printed on the first column now, using the target address size for
+  formatting.
+o Multiple lines for the same section in a linker script are not allowed.
+o Try to avoid "segment is closed" errors in linker scripts which define
+  and use memory regions, and no PHDR definitions.
+o Fixed output of trailing zero-bytes in all hex-formats, like S-Records,
+  IHex, SHex1.
+o (ados/ehf) Always generate short-reloc hunks, when requested by -Rshort.
+  Relocs with offsets > 0xffff will be written in a separate hunk.
+o (ados/ehf) HUNK_LIB parsing sometimes failed. Fixed.
+o (rawbin) Target cbmprg no longer automatically splits the output file,
+  when there are larger gaps between output sections.
+o (rawbin) Trailing S-record (S7, S8, S9) contains the entry address.
+
 - 0.16c (10.06.19)
 o New target file format XFile, for Sharp X68000 computers. At the moment
   only executables may be created. No object file support.

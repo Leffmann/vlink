@@ -1,13 +1,13 @@
-/* $VER: vlink version.c V0.16c (31.01.19)
+/* $VER: vlink version.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2019  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
 /* version/revision */
-#define VERSION "0.16c"
+#define VERSION "0.16d"
 
 #define VERSION_C
 #include "vlink.h"
@@ -21,7 +21,7 @@ static const char *_ver = "$VER: " PNAME " " VERSION " " __AMIGADATE__ "\r\n";
 
 void show_version(void)
 {
-  printf(PNAME " V" VERSION " (c)1997-2019 by Frank Wille\n"
+  printf(PNAME " V" VERSION " (c)1997-2020 by Frank Wille\n"
          "build date: " __DATE__ ", " __TIME__ "\n\n");
 }
 
@@ -41,11 +41,12 @@ void show_usage(void)
          "[-hunkattr secname=value] [-interp path] "
          "[-L library-search-path] [-l library-specifier] [-minalign value] "
          "[-mrel] [-mtype] [-multibase] [-nostdlib] "
+         "[-N old new] "
          "[-o filename] [-osec] [-P symbol] "
          "[-rpath path] [-sc] [-sd] [-shared] [-soname name] [-static] "
          "[-T filename] [-Ttext addr] [-textbaserel] "
          "[-tos-flags/fastload/fastram/private/global/super/readable] "
-         "[-u symbol] "
+         "[-u symbol] [-vicelabels filename]"
          "[-V version] [-y symbol] "
          "input-files...\n\nOptions:\n"
 
@@ -75,12 +76,14 @@ void show_usage(void)
          "-C<constr.type>   Set type of con-/destructors to scan for\n"
          "-minalign <val>   Minimal section alignment (default 0)\n"
          "-baseoff <offset> offset for base relative relocations\n"
+         "-N <old> <new>    Rename input sections\n"
          "-fixunnamed       unnamed sections are named according to their type\n"
          "-nostdlib         don't use default search path\n"
          "-multibase        don't auto-merge base-relative accessed sections\n"
          "-textbaserel      allow base-relative access on code sections\n"
          "-tos-flags <val>  sets TOS flags, refer to documentation\n"
          "-hunkattr <s>=<v> overwrite input section's memory attributes\n"
+         "-vicelabels       generate label mapping for the VICE debugger\n"
          "-shared           generate shared object\n"
          "-soname <name>    set real name of shared object\n"
          "-export-dynamic   export all global symbols as dynamic symbols\n"

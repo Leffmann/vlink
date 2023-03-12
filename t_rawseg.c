@@ -1,8 +1,8 @@
-/* $VER: vlink t_rawseg.c V0.15e (08.05.17)
+/* $VER: vlink t_rawseg.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -66,7 +66,7 @@ struct FFFuncs fff_rawseg = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32
+  0   /* addr_bits from input */
 };
 #endif
 

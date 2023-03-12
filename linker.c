@@ -1,8 +1,8 @@
-/* $VER: vlink linker.c V0.16b (29.12.17)
+/* $VER: vlink linker.c V0.16d (29.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -547,7 +547,7 @@ static unsigned long allocate_common(struct GlobalVars *gv,
 }
 
 
-void print_symbol(FILE *f,struct Symbol *sym)
+void print_symbol(struct GlobalVars *gv,FILE *f,struct Symbol *sym)
 /* print symbol name, type, value, etc. */
 {
   if (sym->type == SYM_COMMON)
@@ -558,16 +558,18 @@ void print_symbol(FILE *f,struct Symbol *sym)
     fprintf(f,"  %s: %s%s%s, referencing %s\n",sym->name,
             sym_bind[sym->bind],sym_type[sym->type],sym_info[sym->info],
             sym->indir_name);
-  else
+  else {
 #if 0
     fprintf(f,"  %s: %s%s%s, value 0x%llx, size %d\n",sym->name,
             sym_bind[sym->bind],sym_type[sym->type],sym_info[sym->info],
             (uint64_t)sym->value,(int)sym->size);
 #else
-    fprintf(f,"  %s: %s%s%s, value 0x%x, size %d\n",sym->name,
+    fprintf(f,"  0x%0*llx %s: %s%s%s, size %d\n",
+            gv->bits_per_taddr/4,(uint64_t)sym->value,sym->name,
             sym_bind[sym->bind],sym_type[sym->type],sym_info[sym->info],
-            (uint32_t)sym->value,(int)sym->size);
+            (int)sym->size);
 #endif
+  }
 }
 
 
@@ -902,6 +904,16 @@ static void merge_seclist(struct GlobalVars *gv,struct list *seclist)
 }
 
 
+static int sym_addr_cmp(const void *left,const void *right)
+/* qsort: compare symbol addresses */
+{
+  unsigned long addrl = (*(struct Symbol **)left)->value;
+  unsigned long addrr = (*(struct Symbol **)right)->value;
+
+  return (addrl<addrr) ? -1 : ((addrl>addrr) ? 1 : 0);
+}
+
+
 void linker_init(struct GlobalVars *gv)
 {
   initlist(&gv->linkfiles);
@@ -989,6 +1001,10 @@ void linker_load(struct GlobalVars *gv)
       else if (fff[i]->endianess>=0 && gv->endianess!=fff[i]->endianess)
         error(61,objname);  /* endianess differs from previous objects */
 
+      /* determine bits per taddr from highest value in all input files */
+      if (fff[i]->addr_bits > gv->bits_per_taddr)
+        gv->bits_per_taddr = fff[i]->addr_bits;
+
       /* create new link file node */
       lf = (struct LinkFile *)alloc(sizeof(struct LinkFile));
       lf->pathname = allocstring(namebuf);
@@ -998,6 +1014,7 @@ void linker_load(struct GlobalVars *gv)
       lf->format = (uint8_t)i;
       lf->type = (uint8_t)ff;
       lf->flags = ifn->flags;
+      lf->renames = ifn->renames;
       if (gv->trace_file)
         fprintf(gv->trace_file,"%s (%s %s)\n",namebuf,fff[i]->tname,
                                               filetypes[ff]);
@@ -1018,6 +1035,12 @@ void linker_load(struct GlobalVars *gv)
     if (gv->endianess < 0)
       gv->endianess = host_endianess();
   }
+
+  /* target format has priority, provided it defines the bits per taddr */
+  if (fff[gv->dest_format]->addr_bits > 0)
+    gv->bits_per_taddr = fff[gv->dest_format]->addr_bits;
+  if (gv->bits_per_taddr == 0)
+    ierror("Neither input nor output formats define target address size");
 
   collect_constructors(gv); /* scan for con-/destructor functions */
   add_undef_syms(gv);       /* put syms. marked as undef. into 1st sec. */
@@ -1498,10 +1521,14 @@ void linker_join(struct GlobalVars *gv)
         }
       }
 
+      if (ls->ld_flags & LSF_USED)
+        error(81,ls->name);  /* multiple use of section in linker script */
+
       /* align this section to the maximum required alignment */
       align_address(ls->relocmem,ls->destmem,ls->alignment);
       ls->base = ls->relocmem->current;
       ls->copybase = ls->destmem->current;
+      ls->ld_flags |= LSF_USED;
 
       /* reset lnksec pointers for phase 2 */
       for (obj=(struct ObjectUnit *)gv->selobjects.first;
@@ -1860,7 +1887,6 @@ void linker_copy(struct GlobalVars *gv)
 
   for (ls=(struct LinkedSection *)gv->lnksec.first;
        ls->n.next!=NULL; ls=(struct LinkedSection *)ls->n.next) {
-    bool print_symbols_of_header = TRUE;
     unsigned long lastsecend = 0;  /* for filling gaps */
 
     if (gv->trace_file) {
@@ -1903,16 +1929,44 @@ void linker_copy(struct GlobalVars *gv)
                 if (sym->type == SYM_RELOC)
                   sym->value += sec->va;  /* was sec->offset */
                 addtail(&ls->symbols,&sym->n);
-
-                if (gv->map_file) {
-                  if (print_symbols_of_header)
-                    fprintf(gv->map_file,"\nSymbols of %s:\n",ls->name);
-                  print_symbol(gv->map_file,sym);
-                  print_symbols_of_header = FALSE;
-                }
               }
             }
           }
+        }
+      }
+    }
+
+    if (gv->map_file) {
+      /* print section's symbols to map file, sorted by address */
+      struct Symbol **sym_ptr_array,**p;
+      int cnt = 0;
+
+      /* count symbols in this section, then sort them by address */
+      for (sym=(struct Symbol *)ls->symbols.first;
+           sym->n.next!=NULL; sym=(struct Symbol *)sym->n.next)
+        cnt++;
+      if (cnt > 0) {
+        sym_ptr_array = alloc(cnt * sizeof(void *));
+        for (sym=(struct Symbol *)ls->symbols.first,p=sym_ptr_array;
+             sym->n.next!=NULL; sym=(struct Symbol *)sym->n.next)
+          *p++ = sym;
+        if (cnt > 1)
+          qsort(sym_ptr_array,cnt,sizeof(void *),sym_addr_cmp);
+
+        fprintf(gv->map_file,"\nSymbols of %s:\n",ls->name);
+        for (p=sym_ptr_array; cnt>0; p++,cnt--)
+          print_symbol(gv,gv->map_file,*p);
+        free(sym_ptr_array);
+      }
+    }
+
+    if (gv->vice_file) {
+      /* Label to address mapping for the VICe emulator */
+      for (sym=(struct Symbol *)ls->symbols.first;
+           sym->n.next!=NULL; sym=(struct Symbol *)sym->n.next) {
+        if (sym->type==SYM_ABS || sym->type==SYM_RELOC) {
+          fprintf(gv->vice_file,"al C:%04x .%s\n",
+                  (unsigned)sym->value,sym->name);
         }
       }
     }
@@ -1929,7 +1983,7 @@ void linker_copy(struct GlobalVars *gv)
         sym->relsect = (struct Section *)maxls->sections.first;
         addtail(&maxls->symbols,&sym->n);
         if (gv->map_file)
-          print_symbol(gv->map_file,sym);
+          print_symbol(gv,gv->map_file,sym);
       }
     }
   }

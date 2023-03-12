@@ -1,8 +1,8 @@
-/* $VER: vlink vlink.h V0.16c (10.03.19)
+/* $VER: vlink vlink.h V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2019  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 #include <stdlib.h>
@@ -101,13 +101,20 @@ struct LibPath {                /* libpaths list. */
 struct Flavours {               /* library flavours */
   int n_flavours;
   int flavours_len;
-  char **flavours;
+  const char **flavours;
   char *flavour_dir;
+};
+
+struct SecRename {              /* renamed input sections */
+  struct SecRename *next;
+  const char *orgname;
+  const char *newname;
 };
 
 struct InputFile {              /* inputlist nodes */
   struct node n;                /* contains names & flags of all inp. files */
   const char *name;
+  struct SecRename *renames;
   bool lib;                     /* search library */
   bool dynamic;                 /* try to link dynamic first */
   int so_ver;                   /* minimum version of shared object */
@@ -125,6 +132,7 @@ struct LinkFile {
   const char *objname;          /* current obj. name: sin.o (archives only)*/
   uint8_t *data;                /* pointer to file data */
   unsigned long length;         /* length of file */
+  struct SecRename *renames;    /* current input section renames */
   uint8_t format;               /* file format - index into targets table */
   uint8_t type;                 /* ID_OBJECT/SHAREDOBJ/LIBARCH */
   uint16_t flags;               /* flags from InputFile */
@@ -416,8 +424,9 @@ struct LinkedSection {          /* linked sections of same type and name */
 };
 
 /* linking flags (ld_flags) */
-#define LSF_NOLOAD         0x01 /* used on empty LinkedSection (ldscript) */
-#define LSF_PRESERVE       0x02 /* don't delete when unused/empty */
+#define LSF_USED           0x01 /* section used in linker script */
+#define LSF_NOLOAD         0x02 /* used on empty LinkedSection (ldscript) */
+#define LSF_PRESERVE       0x04 /* don't delete when unused/empty */
 
 
 struct Phdr {
@@ -488,13 +497,15 @@ struct GlobalVars {
   uint8_t gc_sects;             /* garbage-collect unreferenced sections */
   bool keep_trailing_zeros;     /* keep trailing zero-bytes at end of sect. */
   bool keep_sect_order;         /* keep order of section as found in objs */
-  uint8_t reserved;
+  uint8_t bits_per_taddr;       /* bits in target address (taddr, lword) */
   FILE *map_file;               /* map file */
   FILE *trace_file;             /* linker trace output */
+  FILE *vice_file;              /* label-file for the VICE emulator */
   struct SymNames **trace_syms; /* trace-symbol hash table */
   struct SymNames *prot_syms;   /* list of protected symbols */
   struct SymNames *undef_syms;  /* list of undefined symbols */
   struct SecAttrOvr *secattrovrs; /* input section attribute overwrites */
+  struct SecRename *secrenames; /* input section renaming */
   const char *scriptname;
   const char *ldscript;         /* linker-script to be used for output file */
   const char *entry_name;       /* entry point symbol or addr (-e option) */
@@ -793,7 +804,7 @@ extern void linker_write(struct GlobalVars *);
 extern void linker_cleanup(struct GlobalVars *);
 extern const char *getobjname(struct ObjectUnit *);
 extern void print_function_name(struct Section *,unsigned long);
-extern void print_symbol(FILE *,struct Symbol *);
+extern void print_symbol(struct GlobalVars *,FILE *,struct Symbol *);
 extern bool trace_sym_access(struct GlobalVars *,const char *);
 #endif
 
@@ -900,6 +911,8 @@ extern struct Symbol *bss_entry(struct ObjectUnit *,const char *,
 extern struct SecAttrOvr *addsecattrovr(struct GlobalVars *,char *,uint32_t);
 extern struct SecAttrOvr *getsecattrovr(struct GlobalVars *,const char *,
                                         uint32_t);
+extern void addsecrename(const char *,const char *);
+extern struct SecRename *getsecrename(void);
 extern void trim_sections(struct GlobalVars *);
 extern void untrim_sections(struct GlobalVars *);
 #endif

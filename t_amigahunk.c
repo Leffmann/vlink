@@ -1,8 +1,8 @@
-/* $VER: vlink t_amigahunk.c V0.16c (31.01.19)
+/* $VER: vlink t_amigahunk.c V0.16d (30.03.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2019  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -688,7 +688,7 @@ static void readconv(struct GlobalVars *gv,struct LinkFile *lf)
           /* prepare to parse the first unit from the index */
           hi.indexcnt = nextword32(&hi) << 2;
           hi.indexptr = hi.indexbase = hi.hunkptr;
-          hi.savedhunkcnt = hi.hunkcnt + hi.indexcnt;
+          hi.savedhunkcnt = hi.hunkcnt - hi.indexcnt;
           skipindex(&hi,readindex(&hi));
           indexhunk = TRUE;
           hunksleft = 0;
@@ -1773,7 +1773,7 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
 /* generate an AmigaDOS/EHF relocation hunk for a specific reloc type */
 {
   struct Reloc *nextrel,*rel=(struct Reloc *)sec->relocs.first;
-  bool hunk_required=FALSE,small_offsets=TRUE;
+  bool hunk_required=FALSE,short_relocs;
   lword chkmask,rmask=makemask(rsize);
   uint16_t rpos=0;
   int i;
@@ -1794,20 +1794,27 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
   else
     chkmask = rmask;
 
+  /* Besides HUNK_RELOC32SHORT (HUNK_DREL32 in executables) also
+     HUNK_RELRELOC32 requires 16-bit offsets in executables due to a
+     bug in AmigaDOS. */
+  short_relocs = relhunk==HUNK_RELOC32SHORT || relhunk==HUNK_DREL32 ||
+                 (relhunk==HUNK_RELRELOC32 && !gv->dest_object);
+
   while (nextrel = (struct Reloc *)rel->n.next) {
     struct RelocInsert *ri;
-    int newrcnt;
 
     if (rel->rtype==rtype && (ri=rel->insert)!=NULL) {
       if (ri->bpos==rpos && ri->bsiz==rsize && (ri->mask&rmask)==chkmask) {
-        /* move reloc node of correct type into relocssect's rlist */
-        remnode(&rel->n);
-        addtail(&rlist[rel->relocsect.lnk->index],&rel->n);
-        rel->offset += rpos >> 3;
-        if (++rcnt[rel->relocsect.lnk->index] >= 0x10000 ||
-            rel->offset >= 0x10000)
-          small_offsets = FALSE; /* no short-reloc hunk would be possible */
-        hunk_required = TRUE;
+        unsigned long offs = rel->offset + (rpos >> 3);
+
+        if (!short_relocs || offs < 0x10000) {
+          /* move reloc node of correct type into relocssect's rlist */
+          remnode(&rel->n);
+          addtail(&rlist[rel->relocsect.lnk->index],&rel->n);
+          rcnt[rel->relocsect.lnk->index]++;
+          rel->offset = offs;
+          hunk_required = TRUE;
+        }
       }
     }
     rel = nextrel;
@@ -1815,39 +1822,27 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
 
   if (hunk_required) {  /* there's at least one relocation */
 
-    if ((relhunk==HUNK_ABSRELOC32 &&
-         gv->reloctab_format==RTAB_SHORTOFF && small_offsets) ||
-        (relhunk==HUNK_RELRELOC32 && !gv->dest_object)) {
-      /* Make a short hunk with 16-bit offsets.
-         For executables, HUNK_DREL32 is used instead of the correct
-         HUNK_RELOC32SHORT to be compatible with OS2.0.
-         Due to a bug in OS3.x HUNK_RELRELOC32 requires 16-bit offsets
-         in executables. */
+    if (short_relocs) {
+      /* Make a short-reloc hunk with 16-bit offsets. */
       int cnt=0;
-
-      if (!small_offsets) {
-        /* cannot represent those relocs, so put them back */
-        for (i=0; i<gv->nsecs; i++) {
-          while (rel = (struct Reloc *)remhead(&rlist[i]))
-            addtail(&sec->relocs,&rel->n);
-        }
-        return;
-      }
-
-      if (!gv->dest_object && relhunk==HUNK_ABSRELOC32)
-        relhunk = HUNK_DREL32;
 
       fwrite32be(f,relhunk);  /* reloc hunk id */
       for (i=0; i<gv->nsecs; i++) {
-        if (rcnt[i]) {
-          fwrite16be(f,(uint16_t)rcnt[i]);  /* number of relocations */
+        while (rcnt[i]) {
+          /* cannot write more than 65535 relocs at once with short-relocs */
+          int n = (rcnt[i]>0xffff) ? 0xffff : rcnt[i];
+
+          fwrite16be(f,(uint16_t)n);  /* number of relocations */
           fwrite16be(f,(uint16_t)i);  /* section index */
+          rcnt[i] -= n;
           cnt += 2;
 
           /* store relocation offsets */
-          while (rel = (struct Reloc *)remhead(&rlist[i])) {
-            fwrite16be(f,(uint16_t)rel->offset);
-            cnt++;
+          while (n--) {
+            if (rel = (struct Reloc *)remhead(&rlist[i])) {
+              fwrite16be(f,(uint16_t)rel->offset);
+              cnt++;
+            }
           }
         }
       }
@@ -1859,12 +1854,12 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
     }
 
     else {
-      /* all other relocation hunks */
+      /* normal, 32-bit-offset relocation hunks */
       fwrite32be(f,relhunk);  /* reloc hunk id */
       for (i=0; i<gv->nsecs; i++) {
         while (rcnt[i]) {
           /* never write more than 65536 relocs at once - there is a bug */
-          /* in dos.library which rejects the executable file otherwise */
+          /* in AmigaDOS which rejects the executable file otherwise */
           int n = (rcnt[i]>0x10000) ? 0x10000 : rcnt[i];
 
           fwrite32be(f,(uint32_t)n);  /* number of relocations */
@@ -1873,9 +1868,8 @@ static void reloc_hunk(struct GlobalVars *gv,FILE *f,
 
           /* store relocation offsets */
           while (n--) {
-            if (rel = (struct Reloc *)remhead(&rlist[i])) {
+            if (rel = (struct Reloc *)remhead(&rlist[i]))
               fwrite32be(f,(uint32_t)rel->offset);
-            }
           }
         }
       }
@@ -2097,6 +2091,8 @@ static void writeexec(struct GlobalVars *gv,FILE *f)
     }
 
     /* relocation hunks */
+    if (gv->reloctab_format==RTAB_SHORTOFF)
+      reloc_hunk(gv,f,ls,HUNK_DREL32,R_ABS,32);  /* HUNK_RELOC32SHORT */
     reloc_hunk(gv,f,ls,HUNK_ABSRELOC32,R_ABS,32);
     reloc_hunk(gv,f,ls,HUNK_RELRELOC32,R_PC,32);
     unsupp_relocs(ls);  /* print unsupported relocations */

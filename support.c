@@ -1,8 +1,8 @@
-/* $VER: vlink support.c V0.15b (27.08.16)
+/* $VER: vlink support.c V0.16d (28.02.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2016  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -452,9 +452,9 @@ void write64(bool be,void *p,uint64_t d)
 
 int writetaddr(struct GlobalVars *gv,void *p,lword d)
 {
-  bool be = fff[gv->dest_format]->endianess == _BIG_ENDIAN_;
+  bool be = gv->endianess == _BIG_ENDIAN_;
 
-  switch (fff[gv->dest_format]->addr_bits) {
+  switch (gv->bits_per_taddr) {
     case 16:
       write16(be,p,(uint16_t)d);
       return 2;
@@ -466,7 +466,7 @@ int writetaddr(struct GlobalVars *gv,void *p,lword d)
       return 8;
     default:
       ierror("writetaddr(): target address has %d bits",
-             (int)fff[gv->dest_format]->addr_bits);
+             (int)gv->bits_per_taddr);
       break;
   }
   return 0;
@@ -813,7 +813,7 @@ void memset16(struct GlobalVars *gv,void *start,uint16_t fill,long n)
     uint8_t *p;
     int i;
 
-    write16(fff[gv->dest_format]->endianess==_BIG_ENDIAN_,f,fill);
+    write16(gv->endianess==_BIG_ENDIAN_,f,fill);
     for (p=start,i=((unsigned long)start)&1; n; n--,i^=1)
       *p++ = f[i];
   }

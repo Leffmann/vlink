@@ -1,8 +1,8 @@
-/* $VER: vlink t_rawbin.c V0.15d (05.01.17)
+/* $VER: vlink t_rawbin.c V0.16d (01.04.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
- * Copyright (c) 1997-2017  Frank Wille
+ * Copyright (c) 1997-2020  Frank Wille
  */
 
 
@@ -99,7 +99,7 @@ struct FFFuncs fff_rawbin1 = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32,
+  0,  /* addr_bits from input */
   FFF_SECTOUT
 };
 #endif
@@ -129,7 +129,7 @@ struct FFFuncs fff_rawbin2 = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32,
+  0,  /* addr_bits from input */
   FFF_SECTOUT
 };
 #endif
@@ -284,7 +284,7 @@ struct FFFuncs fff_srec19 = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32
+  16
 };
 #endif
 
@@ -313,7 +313,7 @@ struct FFFuncs fff_srec28 = {
   0,
   RTAB_UNDEF,0,
   -1, /* endianess undefined, only write */
-  32
+  32  /* 24 */
 };
 #endif
 
@@ -689,7 +689,7 @@ static void cbmprg_write(struct GlobalVars *gv,FILE *f)
 /* creates one or more raw-binary files with a Commodore header, suitable */
 /* for loading as an executable on PET, VIC-20, 64, etc. computers */
 {
-  rawbin_writeexec(gv,f,FALSE,'c');
+  rawbin_writeexec(gv,f,TRUE,'c');
 }
 #endif
 
@@ -725,6 +725,9 @@ static void srec_write(struct GlobalVars *gv,FILE *f,int addrsize)
   struct LinkedSection *ls;
   unsigned long len,addr;
   uint8_t *p,buf[MAXSREC+8];
+
+  execaddr = entry_address(gv);  /* determine program's execution address */
+  untrim_sections(gv);           /* output trailing 0-bytes in hex */
 
   /* write header */
   buf[0] = buf[1] = 0;
@@ -778,7 +781,7 @@ static void srec_write(struct GlobalVars *gv,FILE *f,int addrsize)
   }
 
   /* write trailer */
-  memset(buf,0,4);
+  write32be(buf,(uint32_t)execaddr);
   SRecOut(f,11-addrsize,buf,addrsize);
 }
 
@@ -843,6 +846,8 @@ static void ihex_write(struct GlobalVars *gv,FILE *f)
   unsigned long len,addr;
   uint8_t *p;
 
+  untrim_sections(gv);  /* output trailing 0-bytes in hex */
+
   while (ls = get_next_section(gv)) {
     if (ls->size == 0 || !(ls->flags & SF_ALLOC) || (ls->ld_flags & LSF_NOLOAD))
       continue;  /* ignore empty sections */
@@ -897,6 +902,8 @@ static void shex1_write(struct GlobalVars *gv,FILE *f)
   struct LinkedSection *ls;
   unsigned long len,addr;
   uint8_t *p;
+
+  untrim_sections(gv);  /* output trailing 0-bytes in hex */
 
   while (ls = get_next_section(gv)) {
     if (ls->size == 0 || !(ls->flags & SF_ALLOC) || (ls->ld_flags & LSF_NOLOAD))
