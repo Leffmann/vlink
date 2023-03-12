@@ -1,4 +1,4 @@
-/* $VER: vlink errors.c V0.16f (21.07.20)
+/* $VER: vlink errors.c V0.16g (29.12.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -63,8 +63,8 @@ static struct {
     "mask=%llx) at %s+0x%x",EF_ERROR,
   "Target %s: Can't reproduce symbol %s, which is a %s%s%s",EF_ERROR,
   "Option '%s' requires an argument",EF_FATAL,
-  "%s (%s+0x%x): Calculated value 0x%llx doesn't fit into relocation "
-    "type %s (offset=%d, size=%d, mask=0x%llx)",EF_ERROR,           /* 35 */
+  "%s (%s+0x%x): from %s (%s+0x%x): Calculated value 0x%llx doesn't fit into "
+    "relocation type %s (offset=%d, size=%d, mask=0x%llx)",EF_ERROR,/* 35 */
   "%s (%s+0x%x): Base relative reference to relocatable symbol "    /* !!! */
     "%s=0x%llx + 0x%llx (value to write: 0x%llx) doesn't fit into %d bits",EF_ERROR,
   "%s: Malformatted archive member %s",EF_FATAL,

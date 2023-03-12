@@ -1,4 +1,4 @@
-/* $VER: vlink t_os9.c V0.16f (31.08.20)
+/* $VER: vlink t_os9.c V0.16g (18.10.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -179,12 +179,26 @@ static void writedatarefs(FILE *f,struct list *refs,unsigned cnt)
 
 static uint8_t header_parity_check(void *hdr,int len)
 {
+#if 0
+  uint8_t c,r=0,*p=hdr;
+  int i,j;
+
+  for (i=0; i<len; i++) {
+    c = *p++;
+    for (j=0; j<8; j++) {
+      r += !(c & 1);
+      c >>= 1;
+    }
+  }
+  return r;
+#else
   uint8_t c=0,*p=hdr;
   int i;
 
   for (i=0; i<len; i++)
     c ^= *p++;
   return ~c;
+#endif
 }
 
 
@@ -222,6 +236,7 @@ static void crc24(uint32_t poly,uint8_t *dest,uint8_t *buf,size_t len)
   for (i=0; i<len; i++)
     crc = (crc<<8) ^ crctab[((crc>>16) ^ (uint32_t)buf[i]) & 0xff];
 
+  crc ^= 0xffffff;
   dest[0] = (crc>>16) & 0xff;
   dest[1] = (crc>>8) & 0xff;
   dest[2] = crc & 0xff;
@@ -262,9 +277,6 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
   uint8_t *buf,crc[3];
   mh6809 hdr;
 
-  if (f != NULL)
-    ierror("file is open");
-
   /* create output file */
   if ((f = fopen(gv->dest_name,"wb")) == NULL) {
     error(29,gv->dest_name);  /* Can't create output file */
@@ -272,7 +284,7 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
   }
 
   entryoffs = entry_address(gv);
-  stk_size = gv->os9mem ? gv->os9mem*256 : OS9_6809_DEFSTK;
+  stk_size = gv->os9mem ? gv->os9mem : OS9_6809_DEFSTK;
 
   /* determine size of initialized data */
   for (ls=(struct LinkedSection *)gv->lnksec.first, initdata_size=bss_size=0;
@@ -382,7 +394,11 @@ static void writeexec_6809(struct GlobalVars *gv,FILE *f)
   buf = alloc(file_size);
   if (fread(buf,1,file_size,f) == file_size) {
     /* do 24-bit CRC for OS-9 and append it */
+    fpos_t pos;
+
+    fgetpos(f,&pos);
     crc24(0x800063,crc,buf,file_size);
+    fsetpos(f,&pos);  /* Needed to write after reading acc. to ISO-C! */
     fwritex(f,crc,3);
   }
   else

@@ -1,4 +1,4 @@
-/* $VER: vlink ldscript.c V0.16f (25.07.20)
+/* $VER: vlink ldscript.c V0.16g (14.10.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -331,7 +331,7 @@ static uint16_t guess_special_segment(const char *secname,const char **segname)
 }
 
 
-static void scriptsymbol(struct GlobalVars *gv,char *name,
+static void scriptsymbol(struct GlobalVars *gv,char *name,int try,
                          lword val,uint8_t type,uint8_t flags)
 {
   struct Symbol *sym;
@@ -339,7 +339,8 @@ static void scriptsymbol(struct GlobalVars *gv,char *name,
 
   while (sym = *chain) {
     if (!strcmp(name,sym->name)) {
-      error(109,scriptname,getlineno(),name);  /* already defined */
+      if (!try)
+        error(109,scriptname,getlineno(),name);  /* already defined */
       return;
     }
     chain = &sym->obj_chain;
@@ -369,6 +370,15 @@ static void scriptsymbol(struct GlobalVars *gv,char *name,
 bool is_ld_script(struct ObjectUnit *obj)
 {
   return obj==NULL ? FALSE : strncmp(obj->objname,"Linker Script ",14)==0;
+}
+
+
+static void add_cmdline_lnksyms(struct GlobalVars *gv)
+{
+  struct SymNames *sn;
+
+  for (sn=gv->lnk_syms; sn!=NULL; sn=sn->next)
+    scriptsymbol(gv,(char *)sn->name,0,sn->value,SYM_ABS,0);
 }
 
 
@@ -464,15 +474,20 @@ static struct Section *get_dummy_sec(const char *name)
 
 
 static void symbol_assignment(struct GlobalVars *gv,
-                              char *symname,uint8_t symflags)
+                              char *symword,uint8_t symflags)
 {
   char *fn = "symbol_assignment(): ";
   struct LinkedSection *cls = current_ls;
   struct MemoryDescr *rmd = cls ? cls->relocmem : vdefmem;
   struct MemoryDescr *dmd = cls ? cls->destmem : vdefmem;
+  char symname[MAXLEN];
   struct Symbol *sym;
   lword expr_val;
+  int try;
+  
+  try = testchr('?');  /* =? only assign undefined symbols */
 
+  strcpy(symname,symword);  /* symword is guaranteed to fit into MAXLEN */
   if (!strcmp(symname,".")) {
     if (level >= 1) {
       if (!preparse) {
@@ -504,7 +519,7 @@ static void symbol_assignment(struct GlobalVars *gv,
     if (level < 1) {
       if (preparse) {   /* level 0 (outside SECTION) is only parsed once! */
         if (parse_expr(-1,&expr_val)) {
-          scriptsymbol(gv,symname,expr_val,SYM_ABS,symflags);
+          scriptsymbol(gv,symname,try,expr_val,SYM_ABS,symflags);
         }
         else {
           /* Only absolute expr. may be assigned outside SECTIONS block */
@@ -515,7 +530,7 @@ static void symbol_assignment(struct GlobalVars *gv,
 
     else {
       if (preparse) {
-        scriptsymbol(gv,symname,0,SYM_ABS,symflags);
+        scriptsymbol(gv,symname,try,0,SYM_ABS,symflags);
       }
       else {
         if (sym = findsymbol(gv,NULL,symname,0)) {
@@ -837,7 +852,7 @@ static void sc_extern(struct GlobalVars *gv)
       char *name = getword();
 
       if (*name)
-        add_symnames(&gv->undef_syms,allocstring(name));
+        add_symnames(&gv->undef_syms,allocstring(name),0);
       else
         error(78,scriptname,getlineno());   /* missing argument */
 
@@ -2155,6 +2170,7 @@ void init_ld_script(struct GlobalVars *gv)
 
     /* pre-parse script: get memory-regions and symbol definitions */
     init_parser(gv,scriptname,scriptbase,1);
+    add_cmdline_lnksyms(gv);
 
     do {
       while (keyword = getword()) {

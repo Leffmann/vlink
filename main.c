@@ -1,4 +1,4 @@
-/* $VER: vlink main.c V0.16f (28.08.20)
+/* $VER: vlink main.c V0.16g (05.10.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -180,8 +180,8 @@ static int os9_options(struct GlobalVars *gv,int argc,const char *argv[],int i)
 
     sscanf(&argv[i][9],"%li",&mem);
     if (argv[i][last]=='k' || argv[i][last]=='K')
-      mem <<= 2;  /* value is in KBytes instead of pages */
-    gv->os9mem = mem>0 ? mem : 1;
+      mem <<= 10;  /* value is in KBytes instead of Bytes */
+    gv->os9mem = mem>256 ? mem : 256;
   }
   else if (!strncmp(&argv[i][5],"name=",5)) {
     gv->os9name = &argv[i][10];
@@ -514,7 +514,7 @@ int main(int argc,const char *argv[])
 
         case 'u':  /* mark symbol as undefined */
           if (buf = get_option_arg(argc,argv,&i))
-            add_symnames(&gv->undef_syms,buf);
+            add_symnames(&gv->undef_syms,buf,0);
           break;
 
         case 'v':  /* show version and target info */
@@ -603,6 +603,24 @@ int main(int argc,const char *argv[])
           }
           break;
 
+        case 'D':  /* define a linker symbol */
+          if (buf = get_option_arg(argc,argv,&i)) {
+            long long v = 1;
+            char *p;
+
+            if (p = strchr(buf,'=')) {
+              size_t len = p - buf;
+              sscanf(p+1,"%lli",&v);
+              p = alloc(len + 1);
+              strncpy(p,buf,len);
+              p[len] = '\0';
+            }
+            else
+              p = (char *)buf;
+            add_symnames(&gv->lnk_syms,p,(lword)v);
+          }
+          break;
+
         case 'E':  /* set endianess */
           switch (argv[i][2]) {
             case 'B':
@@ -646,7 +664,7 @@ int main(int argc,const char *argv[])
 
         case 'P':  /* protect symbol against stripping */
           if (buf = get_option_arg(argc,argv,&i))
-            add_symnames(&gv->prot_syms,buf);
+            add_symnames(&gv->prot_syms,buf,0);
           break;
 
         case 'R':  /* use short form for relocations */

@@ -176,6 +176,10 @@ data and supports @command{vbcc}-style
 constructor/destructor tables
 in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 
+@item bbc
+Absolute raw binary output, but additionally writes an @file{.inf}-file for
+BBC Micro/Master emulators.
+
 @item cbmprg
 Absolute raw binary output, similar to rawbin1, but with a header
 for Commodore 8-bit computers (PET, VIC-20, 64, etc.).
@@ -284,6 +288,20 @@ Absolute raw binary file. The sections and base addresses
 have to be specified by a linker script (option @option{-T}). Gaps
 between sections are filled with 0-bytes. Without a linker
 script, the raw binary will be relocated to base address 0.
+When option @option{-q} (keep relocs) has been specified, the linker
+will not execute absolute address relocations, but append a relocation
+offset table at the end of the file. The width of a word in this
+table matches the target's address size and uses the target's endianess.
+The first word defines the size of the following table. You may reference
+it by using the @code{__end} symbol, which marks the end of the
+bss section. It follows a byte-stream for the reloction offsets.
+A byte between 1 and 255 represents the distance in bytes
+to the next relocation offset (starts at zero).
+A 0-byte indicates that the following word contains a distance greater
+than 255. Your startup code has to add the program's start address to the
+address values in all these locations. Warning: remaining relocations, like
+PC-relative, or other absolute relocations not matching the address size,
+will still be resolved by the linker! Which may be desired, or not.
 
 @item rawbin2
 Similar to rawbin1. The only difference is that a new output file will
@@ -299,7 +317,10 @@ file while the binary files get their segment name appended to the original
 file name.
 When option @option{-q} (keep relocs) has been specified, then additional files
 containing the relocation offsets are created. The first word in each file
-defines the number of relocations.
+defines the number of relocations. The width of all words in this table
+matches the target's address size. Note, that only simple address relocations
+with the full address size are supported (no halfwords, etc.), which makes
+it nearly useless for certain targets, like the 6502 or RISC CPUs.
 
 @item srec19
 @itemx srec28
@@ -330,13 +351,14 @@ in the data section (@code{__CTOR_LIST__} and @code{__DTOR_LIST__}).
 @command{vlink} command template:
 @example
   @command{vlink [-dhmnqrstvwxMRSX] [-B linkmode] [-b targetname]
-  [-baseoff offset] [-C constructor-type] [-Crel] [-da] [-dc] [-dp] [-EB] [-EL]
-  [-e entrypoint] [-export-dynamic] [-f flavour] [-fixunnamed]
-  [-F filename] [-gc-all] [-gc-empty] [-hunkattr secname=value]
-  [-interp path] [-L library-search-path] [-l library-specifier]
-  [-minalign val] [-mrel] [-mtype] [-mall] [-multibase] [-nostdlib] [-N old new]
-  [-o filename] [-rpath path] [-sc] [-sd] [-shared] [-soname name]
-  [-static] [-T filename] [-Ttext addr] [-textbaserel]
+  [-baseoff offset] [-C constructor-type] [-Crel] [-D symbol=value]
+  [-da] [-dc] [-dp] [-EB] [-EL] [-e entrypoint] [-export-dynamic]
+  [-f flavour] [-fixunnamed] [-F filename] [-gc-all] [-gc-empty]
+  [-hunkattr secname=value] [-interp path] [-L library-search-path]
+  [-l library-specifier] [-minalign val] [-mrel] [-mtype] [-mall]
+  [-multibase] [-nostdlib] [-N old new] [-o filename]
+  [-rpath path] [-sc] [-sd] [-shared] [-soname name] [-static]
+  [-T filename] [-Ttext addr] [-textbaserel]
   [-tos-flags/fastload/fastram/private/global/super/readable]
   [-tos-textbased] [-u symbol] [-vicelabels filename]
   [-V version] [-y symbol] [-P symbol]
@@ -418,6 +440,11 @@ following objects on the command line.
 @item -clr-deluscore
 No longer delete a preceding underscore for the symbols of the
 following objects on the command line.
+
+@item -D linkersymbol[=value]
+Define the linker symbol @code{linkersymbol}, so it may be referenced
+by linker script expressions and from object code. The optional @code{value}
+is assigned to it, which defaults to @code{1}.
 
 @item -d
 @itemx -dc
@@ -587,7 +614,7 @@ by @file{"basename."}.
 @item -os9-mem=val[K]
 Defines the size of the stack and the parameter area, which the
 linker will add to the permanent storage size in the module header.
-The value given in @code{val} is in 256-bytes pages. You may specify
+The value given in @code{val} is in bytes. You may specify
 the value in K-bytes by appending a '@code{k}' character.
 The size of the stack and parameter area defaults to 1024 bytes for
 OS9/6809.
@@ -729,7 +756,7 @@ Prints @command{vlink} version string, default library search path
 and implemented target file formats.
 
 @item -vicelabels filename
-Generates a label address mapping file to the VICE debugger.
+Generates a label address mapping file for the VICE debugger.
 
 @item -w
 Suppress all warning messages.
@@ -798,6 +825,15 @@ where @code{expression} may contain the usual arithmetic operations,
 other symbols and functions (@xref{Functions}). The special symbol
 @code{.} (dot) is the location counter and defines the current address
 (VMA) in memory where the following sections and data are placed.
+
+An optional symbol assignment looks like
+@example
+symbol =? expression;
+@end example
+where the only difference to a normal symbol assignment is, that
+@code{symbol} will only be defined with the expression when it was
+not already defined before (in a line above, or on the command line
+with option @option{-D}).
 
 All valid linker-script commands are described here: @xref{Commands}.
 
@@ -1008,8 +1044,8 @@ The following functions are currently supported in vlink linker scripts:
   Return the address (VMA) of the section named @code{sectionname}.
 
 @item ALIGN(align)
-  Align the location counter (@code{.}) to the next address which is a
-  multiple of @code{align}.
+  Return the location counter (@code{.}), aligned to the next address 
+  which is a multiple of @code{align}.
 
 @item LENGTH(memoryname)
   Return the length of the memory region named @code{memoryname}.
@@ -1058,9 +1094,11 @@ alphabetical order, probably not complete):
 @itemize
   @item Karoly Balogh
   @item Volker Barthelmann
+  @item Matthias Bock
   @item Dennis Boon
   @item Alexander Coers
   @item Romain Giot
+  @item Stefan Haubenthal
   @item Mikael Kalms
   @item Miro Kropacek
   @item Jean-Paul Mari

@@ -1,4 +1,4 @@
-/* $VER: vlink targets.c V0.16f (02.09.20)
+/* $VER: vlink targets.c V0.16g (29.12.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -112,6 +112,9 @@ struct FFFuncs *fff[] = {
 #endif
 #ifdef JAGSRV
   &fff_jagsrv,
+#endif
+#ifdef BBC
+  &fff_bbc,
 #endif
 #ifdef SREC19
   &fff_srec19,
@@ -783,6 +786,26 @@ static struct SymbolMask *makesymbolmask(struct GlobalVars *gv,
 }
 
 
+struct Section *getinpsecoffs(struct LinkedSection *ls,
+                              unsigned long ooff,unsigned long *ioff)
+/* determine the offset on an input-section for the given output section
+   offset */
+{
+  struct Section *sec;
+
+  for (sec=(struct Section *)ls->sections.first;
+       sec->n.next!=NULL; sec=(struct Section *)sec->n.next) {
+    if (ooff>=sec->offset && ooff<sec->offset+sec->size) {
+      *ioff = ooff-sec->offset;
+      return sec;
+    }
+  }
+  ierror("getinpsecoffs: (%s+0x%lx) does not belong to any input section!",
+         ls->name,ooff);
+  return NULL;
+}
+
+
 struct RelocInsert *initRelocInsert(struct RelocInsert *ri,uint16_t pos,
                                     uint16_t siz,lword msk)
 {
@@ -1139,9 +1162,16 @@ void calc_relocs(struct GlobalVars *gv,struct LinkedSection *ls)
       struct RelocInsert *ri;
 
       /* Calculated value doesn't fit into relocation type x ... */
-      if (ri = r->insert)
-        error(35,gv->dest_name,ls->name,r->offset,val,reloc_name[r->rtype],
+      if (ri = r->insert) {
+        struct Section *isec;
+        unsigned long ioffs;
+
+        isec = getinpsecoffs(ls,r->offset,&ioffs);
+        /*print_function_name(isec,ioffs); <- sym-values are modified! */
+        error(35,gv->dest_name,ls->name,r->offset,getobjname(isec->obj),
+              isec->name,ioffs,val,reloc_name[r->rtype],
               (int)ri->bpos,(int)ri->bsiz,(unsigned long long)ri->mask);
+      }
       else
         ierror("%sReloc (%s+%lx), type=%s, without RelocInsert",
                fn,ls->name,r->offset,reloc_name[r->rtype]);
@@ -1277,7 +1307,7 @@ static int vbcc_xtors_pri(const char *s)
    Example: _INIT_9_OpenLibs (constructor with priority 9) */
 {
   if (*s++ == '_')
-    if (isdigit((unsigned)*s))
+    if (isdigit((unsigned char)*s))
       return atoi(s);
   return 0;
 }
@@ -1290,7 +1320,7 @@ static int sasc_xtors_pri(const char *s)
    Example: _STI_110_OpenLibs (constructor with priority 110) */
 {
   if (*s++ == '_')
-    if (isdigit((unsigned)*s))
+    if (isdigit((unsigned char)*s))
       return 30000-atoi(s);  /* 30000 is the default priority, i.e. 0 */
   return 0;
 }
@@ -2126,7 +2156,8 @@ bool discard_symbol(struct GlobalVars *gv,struct Symbol *sym)
     if (gv->discard_local==DISLOC_TMP) {
       char c = sym->name[0];
 
-      if (!((c=='L' || c=='l' || c=='.') && isdigit((unsigned)sym->name[1])))
+      if (!((c=='L' || c=='l' || c=='.')
+          && isdigit((unsigned char)sym->name[1])))
         return FALSE;
     }
   }

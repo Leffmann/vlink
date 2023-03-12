@@ -84,6 +84,7 @@
 #define IHEX                /* Intel Hex */
 #define SHEX1               /* Customer specific hex format */
 #define RAWSEG              /* multiple raw segment files */
+#define BBC                 /* BBC binary with info file */
 
 #define VOBJ                /* vasm special object format */
 

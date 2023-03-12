@@ -1,4 +1,4 @@
-/* $VER: vlink vlink.h V0.16f (28.08.20)
+/* $VER: vlink vlink.h V0.16g (29.12.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -367,6 +367,7 @@ struct Symbol {
 struct SymNames {
   struct SymNames *next;        /* next symbol name in hash chain */
   const char *name;             /* symbol's name */
+  lword value;                  /* optional value */
 };
 
 
@@ -520,6 +521,7 @@ struct GlobalVars {
   struct SymNames **trace_syms; /* trace-symbol hash table */
   struct SymNames *prot_syms;   /* list of protected symbols */
   struct SymNames *undef_syms;  /* list of undefined symbols */
+  struct SymNames *lnk_syms;    /* list of command line linker symbols */
   struct SecAttrOvr *secattrovrs; /* input section attribute overwrites */
   struct SecRename *secrenames; /* input section renaming */
   const char *scriptname;
@@ -793,6 +795,7 @@ extern void fwrite16be(FILE *,uint16_t);
 extern void fwrite32le(FILE *,uint32_t);
 extern void fwrite16le(FILE *,uint16_t);
 extern void fwrite8(FILE *,uint8_t);
+extern void fwritetaddr(struct GlobalVars *,FILE *,lword);
 extern void fwrite_align(FILE *,uint32_t,uint32_t);
 extern void fwritegap(FILE *,long);
 extern unsigned long elf_hash(const char *);
@@ -802,7 +805,7 @@ extern int shiftcnt(uint32_t);
 extern int lshiftcnt(lword);
 extern int highest_bit_set(lword);
 extern lword sign_extend(lword,int);
-void add_symnames(struct SymNames **,const char *);
+void add_symnames(struct SymNames **,const char *,lword);
 #endif
 #define listempty(x) ((x)->first->next==NULL)
 #define makemask(x) ((lword)(1LL<<(x))-1)
@@ -879,6 +882,8 @@ extern void fixlnksymbols(struct GlobalVars *,struct LinkedSection *);
 extern struct Symbol *find_any_symbol(struct GlobalVars *,
                                       struct Section *,const char *);
 extern void reenter_global_objsyms(struct GlobalVars *,struct ObjectUnit *);
+extern struct Section *getinpsecoffs(struct LinkedSection *,unsigned long,
+                                     unsigned long *);
 extern struct RelocInsert *initRelocInsert(struct RelocInsert *,
                                            uint16_t,uint16_t,lword);
 extern struct Reloc *newreloc(struct GlobalVars *,struct Section *,
@@ -981,6 +986,7 @@ extern bool patternlist_match(char **,const char *);
 #ifndef EXPR_C
 extern void skip(void);
 extern char getchr(void);
+extern int testchr(char);
 extern void skipblock(int,char,char);
 extern void back(int);
 extern char *gettxtptr(void);
@@ -1142,6 +1148,9 @@ extern struct FFFuncs fff_dragonbin;
 #endif
 #if defined(JAGSRV)
 extern struct FFFuncs fff_jagsrv;
+#endif
+#if defined(BBC)
+extern struct FFFuncs fff_bbc;
 #endif
 #if defined(SREC19)
 extern struct FFFuncs fff_srec19;

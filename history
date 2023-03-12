@@ -10,10 +10,28 @@ vlink history
 (elf64x86):   changes are relevant for ELF64-x86_64 only
 (a.out):      general a.out changes
 (aoutmint):   changes are relevant for MiNT only
+(os9):        changes are relevant for OS-9 modules
 (vobj):       changes for VOBJ format
 (tos):        changes for the Atari TOS format
 (xfile):      changes for the Sharp X68000 XFile format
 
+
+- 0.16g (31.12.20)
+o New target file format bbc to generate .inf files for BBC Micro/Master.
+o Fixed symbol assignments refering to other symbols in linker scripts.
+o Optional symbol assignments can be done with =?. Such an assignment will
+  be silently ignored when the symbol already exists.
+o New option -D to define linker symbols on the command line.
+o ASCII output (S-Rec, ihex, etc.) is now done using the host systems
+  line endings.
+o When calculated relocation addends in raw binary formats are out of bounds,
+  also print the name and section-offset of the input file.
+o (os9) -os9-mem now specifies the memory to allocate in bytes instead
+  of pages.
+o (os9) Fixed header parity and CRC calculation.
+o (os9) Fixed write error when vlink was not compiled by gcc.
+o (rawbin) -q can be used with rawbin1 to append a relocation table.
+o (rawseg) -q (emit relocations) is now supported for any target address size.
 
 - 0.16f (28.09.20)
 o New target file format os9-6809 to generate OS-9 modules for 6809 systems.

@@ -1,4 +1,4 @@
-/* $VER: vlink expr.c V0.16f (21.07.20)
+/* $VER: vlink expr.c V0.16g (14.10.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -60,6 +60,17 @@ char getchr(void)
   if (c = *s)
     s++;
   return c;
+}
+
+
+int testchr(char c)
+/* check for character, skip it and return true when present */
+{
+  if (*s == c) {
+    s++;
+    return 1;
+  }
+  return 0;
 }
 
 

@@ -1,4 +1,4 @@
-/* $VER: vlink support.c V0.16d (28.02.20)
+/* $VER: vlink support.c V0.16g (17.11.20)
  *
  * This file is part of vlink, a portable linker for multiple
  * object formats.
@@ -706,6 +706,17 @@ void fwrite8(FILE *fp,uint8_t w)
 }
 
 
+void fwritetaddr(struct GlobalVars *gv,FILE *fp,lword d)
+/* write a target address to file */
+{
+  char buf[16];
+  size_t len;
+
+  if (len = (size_t)writetaddr(gv,buf,d))
+    fwritex(fp,buf,len);
+}
+
+
 void fwrite_align(FILE *fp,uint32_t a,uint32_t n)
 /* writes as many zero bytes as required for alignment a (a bits */
 /* must be zero) with current file offset n */
@@ -833,7 +844,7 @@ lword sign_extend(lword v,int n)
 }
 
 
-void add_symnames(struct SymNames **snlist,const char *name)
+void add_symnames(struct SymNames **snlist,const char *name,lword val)
 /* add a new name to a SymNames list */
 {
   struct SymNames *new = alloc(sizeof(struct SymNames));
@@ -841,6 +852,7 @@ void add_symnames(struct SymNames **snlist,const char *name)
 
   new->next = NULL;
   new->name = name;
+  new->value = val;
   if (sn = *snlist) {
     while (sn->next)
       sn = sn->next;
